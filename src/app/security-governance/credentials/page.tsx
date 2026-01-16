@@ -85,7 +85,31 @@ export default function ManageCredentials() {
                     return [];
                 }
 
-                const credentials = response.data || response || [];
+                // Extract credentials data from response
+                let credentials = response.data || response || [];
+
+                // Validate that credentials is actually an array of objects, not a string (HTML error response)
+                if (typeof credentials === 'string') {
+                    console.error(
+                        '❌ [API] Received string instead of array - API may be returning HTML:',
+                        credentials.substring(0, 100),
+                    );
+                    return [];
+                }
+
+                if (!Array.isArray(credentials)) {
+                    console.error(
+                        '❌ [API] Response is not an array:',
+                        typeof credentials,
+                    );
+                    return [];
+                }
+
+                // Filter out any invalid entries (ensure each item has required properties)
+                credentials = credentials.filter(
+                    (item: any) => item && typeof item === 'object' && item.id,
+                );
+
                 console.log(
                     '📦 [API] Loaded credentials from API:',
                     credentials.length,
@@ -715,10 +739,9 @@ export default function ManageCredentials() {
             );
 
             // Extract unique credential names from current Credentials (local state only)
-            const credentialsArray = Array.isArray(credentials) ? credentials : [];
             const uniqueCredentialNames = Array.from(
                 new Set(
-                    credentialsArray
+                    credentials
                         .map((credential) => credential.credentialName)
                         .filter(Boolean),
                 ),
@@ -730,7 +753,7 @@ export default function ManageCredentials() {
             // Extract unique entities from current Credentials (local state only)
             const uniqueEntities = Array.from(
                 new Set(
-                    credentialsArray
+                    credentials
                         .map((credential) => credential.entity)
                         .filter(Boolean),
                 ),

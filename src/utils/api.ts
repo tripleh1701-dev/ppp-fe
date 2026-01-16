@@ -70,9 +70,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         '/api/entities',
     ];
 
+    // Extract the path without query parameters for matching
+    const pathWithoutQuery = cleanPath.split('?')[0];
+
     const isSysAppEndpoint = sysAppEndpoints.some(
         (endpoint) =>
-            cleanPath === endpoint || cleanPath.startsWith(`${endpoint}/`),
+            pathWithoutQuery === endpoint ||
+            pathWithoutQuery.startsWith(`${endpoint}/`),
     );
 
     // For local development, don't transform paths - backend has routes directly
@@ -154,14 +158,59 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         return undefined as unknown as T;
     }
 
-    // If content-type is not JSON, return the text as-is
+    // If content-type is not JSON, check if it's an HTML error page
     if (contentType && !contentType.includes('application/json')) {
+        // Check for common HTML error indicators
+        if (
+            text.includes('<!doctype') ||
+            text.includes('<!DOCTYPE') ||
+            text.includes('<html') ||
+            text.includes('You need to enable JavaScript')
+        ) {
+            console.error(
+                '❌ API returned HTML instead of JSON - possible routing issue:',
+                url,
+            );
+            console.error('❌ Response preview:', text.substring(0, 200));
+            throw new Error(`API returned HTML instead of JSON. URL: ${url}`);
+        }
         return text as unknown as T;
     }
 
     try {
-        return JSON.parse(text) as T;
+        const parsed = JSON.parse(text);
+
+        // Additional check: if we expected JSON but got HTML that somehow parsed
+        if (
+            typeof parsed === 'string' &&
+            (parsed.includes('<!doctype') ||
+                parsed.includes('<!DOCTYPE') ||
+                parsed.includes('<html') ||
+                parsed.includes('You need to enable JavaScript'))
+        ) {
+            console.error(
+                '❌ API returned HTML in JSON wrapper - possible routing issue:',
+                url,
+            );
+            throw new Error(`API returned HTML instead of JSON. URL: ${url}`);
+        }
+
+        return parsed as T;
     } catch (e) {
+        // If JSON parsing fails, check if it looks like HTML
+        if (
+            text.includes('<!doctype') ||
+            text.includes('<!DOCTYPE') ||
+            text.includes('<html') ||
+            text.includes('You need to enable JavaScript')
+        ) {
+            console.error(
+                '❌ API returned HTML instead of JSON - possible routing issue:',
+                url,
+            );
+            console.error('❌ Response preview:', text.substring(0, 200));
+            throw new Error(`API returned HTML instead of JSON. URL: ${url}`);
+        }
         // If JSON parsing fails, return undefined instead of throwing
         console.warn('Failed to parse JSON response, returning undefined:', e);
         return undefined as unknown as T;

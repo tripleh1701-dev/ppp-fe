@@ -270,47 +270,47 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
             {isOpen &&
                 dropdownPosition &&
                 createPortal(
-                <div
+                    <div
                         className='fixed z-[99999] bg-white border border-gray-200 rounded-md shadow-xl'
-                    style={{
-                        top: `${dropdownPosition.top}px`,
-                        left: `${dropdownPosition.left}px`,
-                        width: `${dropdownPosition.width}px`,
-                        maxHeight: '120px',
+                        style={{
+                            top: `${dropdownPosition.top}px`,
+                            left: `${dropdownPosition.left}px`,
+                            width: `${dropdownPosition.width}px`,
+                            maxHeight: '120px',
                             overflow: 'auto',
-                    }}
-                    onMouseDown={(e) => e.preventDefault()} // Prevent losing focus
-                >
-                    {options.map((option, index) => (
-                        <button
-                            key={option.value}
+                        }}
+                        onMouseDown={(e) => e.preventDefault()} // Prevent losing focus
+                    >
+                        {options.map((option, index) => (
+                            <button
+                                key={option.value}
                                 type='button'
-                            onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                            }}
-                            onMouseEnter={() => setHighlightedIndex(index)}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onChange(option.value);
-                                setIsOpen(false);
-                                setHighlightedIndex(-1);
-                            }}
-                            className={`w-full text-left px-2 py-1.5 text-[11px] hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors border-none ${
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }}
+                                onMouseEnter={() => setHighlightedIndex(index)}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onChange(option.value);
+                                    setIsOpen(false);
+                                    setHighlightedIndex(-1);
+                                }}
+                                className={`w-full text-left px-2 py-1.5 text-[11px] hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors border-none ${
                                     value === option.value
                                         ? 'bg-blue-100 text-blue-700'
                                         : highlightedIndex === index
                                         ? 'bg-blue-50 text-blue-700'
                                         : 'text-slate-700'
-                            }`}
-                        >
-                            {option.label}
-                        </button>
-                    ))}
-                </div>,
+                                }`}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>,
                     document.body,
-            )}
+                )}
         </div>
     );
 };
@@ -1423,7 +1423,7 @@ function UserGroupMultiSelect({
             const newServices = selectedUserGroups.filter(
                 (s: string) => s !== userGroupToRemove,
             );
-        onChange(newServices.join(', '));
+            onChange(newServices.join(', '));
         },
         [selectedUserGroups, onChange],
     );
@@ -1431,16 +1431,16 @@ function UserGroupMultiSelect({
     // Helper function to toggle a user group selection
     const toggleUserGroup = React.useCallback(
         (userGroupName: string) => {
-        const isSelected = selectedUserGroups.includes(userGroupName);
-        let newServices;
-        if (isSelected) {
+            const isSelected = selectedUserGroups.includes(userGroupName);
+            let newServices;
+            if (isSelected) {
                 newServices = selectedUserGroups.filter(
                     (s: string) => s !== userGroupName,
                 );
-        } else {
-            newServices = [...selectedUserGroups, userGroupName];
-        }
-        onChange(newServices.join(', '));
+            } else {
+                newServices = [...selectedUserGroups, userGroupName];
+            }
+            onChange(newServices.join(', '));
         },
         [selectedUserGroups, onChange],
     );
@@ -1488,8 +1488,8 @@ function UserGroupMultiSelect({
             // Find table container for better positioning
             const tableContainer =
                 containerRef.current?.closest('[role="table"]') ||
-                                  containerRef.current?.closest('.overflow-auto') ||
-                                  document.body;
+                containerRef.current?.closest('.overflow-auto') ||
+                document.body;
             const tableRect = tableContainer.getBoundingClientRect();
 
             const width = 256;
@@ -1519,8 +1519,8 @@ function UserGroupMultiSelect({
             // Find the table container to ensure dropdown stays within table bounds
             const tableContainer =
                 moreServicesRef.current.closest('[role="table"]') ||
-                                  moreServicesRef.current.closest('.overflow-auto') ||
-                                  document.body;
+                moreServicesRef.current.closest('.overflow-auto') ||
+                document.body;
             const tableRect = tableContainer.getBoundingClientRect();
 
             // Calculate width with stricter table container constraints
@@ -1839,20 +1839,20 @@ function UserGroupMultiSelect({
                                                         getCredentialColor(
                                                             userGroup,
                                                         );
-                                                return (
-                                                    <div
-                                                        key={`additional-${idx}`}
-                                                        className='flex items-center group/additional w-full'
-                                                    >
-                                                        <span className='w-full flex items-center gap-1 px-1.5 py-0.5 text-[11px] leading-[14px] bg-white text-black rounded-sm relative'>
-                                                            {userGroup}
-                                                        </span>
-                                                        <button
-                                                            onClick={() => {
+                                                    return (
+                                                        <div
+                                                            key={`additional-${idx}`}
+                                                            className='flex items-center group/additional w-full'
+                                                        >
+                                                            <span className='w-full flex items-center gap-1 px-1.5 py-0.5 text-[11px] leading-[14px] bg-white text-black rounded-sm relative'>
+                                                                {userGroup}
+                                                            </span>
+                                                            <button
+                                                                onClick={() => {
                                                                     removeUserGroup(
                                                                         userGroup,
                                                                     );
-                                                                // Close dropdown if no more Additional User Groups
+                                                                    // Close dropdown if no more Additional User Groups
                                                                     if (
                                                                         selectedUserGroups.length -
                                                                             1 <=
@@ -1861,16 +1861,16 @@ function UserGroupMultiSelect({
                                                                         setShowMoreServices(
                                                                             false,
                                                                         );
-                                                                }
-                                                            }}
-                                                            className='opacity-0 group-hover/additional:opacity-100 transition-opacity p-1 rounded-sm hover:bg-slate-100'
-                                                            aria-label='Remove'
-                                                        >
-                                                            <X size={12} />
-                                                        </button>
-                                                    </div>
-                                                );
-                                            })}
+                                                                    }
+                                                                }}
+                                                                className='opacity-0 group-hover/additional:opacity-100 transition-opacity p-1 rounded-sm hover:bg-slate-100'
+                                                                aria-label='Remove'
+                                                            >
+                                                                <X size={12} />
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
                                         </div>
                                     </div>
                                 </div>,
@@ -1927,7 +1927,7 @@ function UserGroupMultiSelect({
                                             (row) =>
                                                 row.getAttribute('data-col') ===
                                                 'enterprise',
-                                    );
+                                        );
                                     const nextInput =
                                         nextEnterpriseCol?.querySelector(
                                             'input',
@@ -1969,9 +1969,9 @@ function UserGroupMultiSelect({
                                             id: string;
                                             name: string;
                                         }>('/api/userGroups', {
-                            name: query.trim(),
-                        });
-                        if (created) {
+                                            name: query.trim(),
+                                        });
+                                        if (created) {
                                             setOptions((prev) => {
                                                 const exists = prev.some(
                                                     (o) => o.id === created!.id,
@@ -2375,116 +2375,116 @@ function UserGroupMultiSelect({
                                     </span>
                                 </button>
                                 {showAdder && (
-                                <div className='mt-2 overflow-hidden'>
-                                    {(() => {
-                                        const similarMatch = adding.trim()
-                                            ? options.find(
-                                                  (opt) =>
-                                                      opt.name.toLowerCase() ===
-                                                      adding
-                                                          .trim()
-                                                          .toLowerCase(),
-                                              )
-                                            : null;
+                                    <div className='mt-2 overflow-hidden'>
+                                        {(() => {
+                                            const similarMatch = adding.trim()
+                                                ? options.find(
+                                                      (opt) =>
+                                                          opt.name.toLowerCase() ===
+                                                          adding
+                                                              .trim()
+                                                              .toLowerCase(),
+                                                  )
+                                                : null;
 
-                                        return (
-                                            <>
-                                                <div className='flex items-center gap-2'>
-                                                    <motion.input
-                                                        initial={{
-                                                            x: -12,
-                                                            opacity: 0,
-                                                        }}
-                                                        animate={{
-                                                            x: 0,
-                                                            opacity: 1,
-                                                        }}
-                                                        transition={{
-                                                            type: 'spring',
-                                                            stiffness: 420,
-                                                            damping: 28,
-                                                        }}
-                                                        value={adding}
+                                            return (
+                                                <>
+                                                    <div className='flex items-center gap-2'>
+                                                        <motion.input
+                                                            initial={{
+                                                                x: -12,
+                                                                opacity: 0,
+                                                            }}
+                                                            animate={{
+                                                                x: 0,
+                                                                opacity: 1,
+                                                            }}
+                                                            transition={{
+                                                                type: 'spring',
+                                                                stiffness: 420,
+                                                                damping: 28,
+                                                            }}
+                                                            value={adding}
                                                             onChange={(
                                                                 e: any,
                                                             ) =>
-                                                            setAdding(
+                                                                setAdding(
                                                                     e.target
                                                                         .value,
-                                                            )
-                                                        }
+                                                                )
+                                                            }
                                                             onKeyDown={(
                                                                 e: any,
                                                             ) => {
-                                                            if (
-                                                                e.key ===
-                                                                'Enter'
-                                                            )
-                                                                addNew();
-                                                            if (
-                                                                e.key ===
-                                                                'Escape'
-                                                            )
-                                                                setShowAdder(
-                                                                    false,
-                                                                );
-                                                        }}
-                                                        placeholder=''
-                                                        className={`flex-1 rounded border px-2 py-1 text-[12px] ${
-                                                            similarMatch
-                                                                ? 'border-amber-400 bg-amber-50'
-                                                                : 'border-slate-300'
-                                                        }`}
-                                                    />
-                                                    <button
-                                                        onClick={addNew}
-                                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[12px] ${
-                                                            similarMatch
-                                                                ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                                                                : 'bg-violet-600 hover:bg-violet-700 text-white'
-                                                        }`}
-                                                    >
-                                                        {similarMatch
-                                                            ? 'Add Existing'
-                                                            : 'Add'}
-                                                    </button>
-                                                </div>
-                                                {similarMatch && (
-                                                    <motion.div
-                                                        initial={{
-                                                            opacity: 0,
-                                                            height: 0,
-                                                        }}
-                                                        animate={{
-                                                            opacity: 1,
-                                                            height: 'auto',
-                                                        }}
-                                                        className='mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800'
-                                                    >
-                                                        <span className='font-medium'>
+                                                                if (
+                                                                    e.key ===
+                                                                    'Enter'
+                                                                )
+                                                                    addNew();
+                                                                if (
+                                                                    e.key ===
+                                                                    'Escape'
+                                                                )
+                                                                    setShowAdder(
+                                                                        false,
+                                                                    );
+                                                            }}
+                                                            placeholder=''
+                                                            className={`flex-1 rounded border px-2 py-1 text-[12px] ${
+                                                                similarMatch
+                                                                    ? 'border-amber-400 bg-amber-50'
+                                                                    : 'border-slate-300'
+                                                            }`}
+                                                        />
+                                                        <button
+                                                            onClick={addNew}
+                                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[12px] ${
+                                                                similarMatch
+                                                                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                                                    : 'bg-violet-600 hover:bg-violet-700 text-white'
+                                                            }`}
+                                                        >
+                                                            {similarMatch
+                                                                ? 'Add Existing'
+                                                                : 'Add'}
+                                                        </button>
+                                                    </div>
+                                                    {similarMatch && (
+                                                        <motion.div
+                                                            initial={{
+                                                                opacity: 0,
+                                                                height: 0,
+                                                            }}
+                                                            animate={{
+                                                                opacity: 1,
+                                                                height: 'auto',
+                                                            }}
+                                                            className='mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800'
+                                                        >
+                                                            <span className='font-medium'>
                                                                 ⚠️ Similar
                                                                 service exists:
-                                                        </span>{' '}
-                                                        &quot;
-                                                        {similarMatch.name}
-                                                        &quot;
-                                                        <br />
-                                                        <span className='text-amber-600'>
-                                                            Click &quot;Add
+                                                            </span>{' '}
+                                                            &quot;
+                                                            {similarMatch.name}
+                                                            &quot;
+                                                            <br />
+                                                            <span className='text-amber-600'>
+                                                                Click &quot;Add
                                                                 Existing&quot;
                                                                 to select it
                                                                 instead of
-                                                            creating a
-                                                            duplicate.
-                                                        </span>
-                                                    </motion.div>
-                                                )}
-                                            </>
-                                        );
-                                    })()}
-                                </div>
-                            )}
-                        </div>
+                                                                creating a
+                                                                duplicate.
+                                                            </span>
+                                                        </motion.div>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
                         )}
                     </div>,
                     document.body,
@@ -2800,12 +2800,12 @@ function AsyncChipSelect({
         // Find the table container to ensure dropdown stays within table bounds
         const tableContainer =
             containerRef.current.closest('.compact-table') ||
-                              containerRef.current.closest('[role="table"]') ||
-                              containerRef.current.closest('.rounded-xl') ||
-                              containerRef.current.closest('.overflow-auto') ||
-                              containerRef.current.closest('.w-full.compact-table') ||
-                              document.querySelector('.compact-table') ||
-                              document.body;
+            containerRef.current.closest('[role="table"]') ||
+            containerRef.current.closest('.rounded-xl') ||
+            containerRef.current.closest('.overflow-auto') ||
+            containerRef.current.closest('.w-full.compact-table') ||
+            document.querySelector('.compact-table') ||
+            document.body;
         const tableRect = tableContainer.getBoundingClientRect();
 
         // Calculate portal position with table container constraints
@@ -2946,10 +2946,9 @@ function AsyncChipSelect({
                             credentialName?: string;
                         }>
                     >(rolesUrl)) || [];
-                const responseArray = Array.isArray(response) ? response : ((response as any)?.data ? (Array.isArray((response as any).data) ? (response as any).data : []) : []);
-                allData = responseArray
+                allData = response
                     .map((item: any) => ({
-                    id: item.id || item.roleId || String(Math.random()),
+                        id: item.id || item.roleId || String(Math.random()),
                         name: item.name || item.credentialName || '',
                     }))
                     .filter((item: any) => item.name);
@@ -2972,10 +2971,10 @@ function AsyncChipSelect({
                     params.append('enterpriseId', selectedEnterpriseId);
                 if (params.toString()) entitiesUrl += `?${params.toString()}`;
 
-                const entitiesResponse = (await api.get<Array<{id: string; name: string}>>(
+                allData =
+                    (await api.get<Array<{id: string; name: string}>>(
                         entitiesUrl,
                     )) || [];
-                allData = Array.isArray(entitiesResponse) ? entitiesResponse : ((entitiesResponse as any)?.data ? (Array.isArray((entitiesResponse as any).data) ? (entitiesResponse as any).data : []) : []);
             } else if (type === 'product') {
                 // Get account/enterprise context from localStorage
                 const selectedAccountId =
@@ -2995,10 +2994,10 @@ function AsyncChipSelect({
                     params.append('enterpriseId', selectedEnterpriseId);
                 if (params.toString()) productsUrl += `?${params.toString()}`;
 
-                const productsResponse = (await api.get<Array<{id: string; name: string}>>(
+                allData =
+                    (await api.get<Array<{id: string; name: string}>>(
                         productsUrl,
                     )) || [];
-                allData = Array.isArray(productsResponse) ? productsResponse : ((productsResponse as any)?.data ? (Array.isArray((productsResponse as any).data) ? (productsResponse as any).data : []) : []);
             } else if (type === 'service') {
                 // Get account/enterprise context from localStorage
                 const selectedAccountId =
@@ -3018,10 +3017,10 @@ function AsyncChipSelect({
                     params.append('enterpriseId', selectedEnterpriseId);
                 if (params.toString()) servicesUrl += `?${params.toString()}`;
 
-                const servicesResponse = (await api.get<Array<{id: string; name: string}>>(
+                allData =
+                    (await api.get<Array<{id: string; name: string}>>(
                         servicesUrl,
                     )) || [];
-                allData = Array.isArray(servicesResponse) ? servicesResponse : ((servicesResponse as any)?.data ? (Array.isArray((servicesResponse as any).data) ? (servicesResponse as any).data : []) : []);
             } else {
                 // Default empty
                 allData = [];
@@ -3408,35 +3407,35 @@ function AsyncChipSelect({
                 dropdownPortalPos &&
                 allOptions.length > 0 &&
                 createPortal(
-                <div
-                    ref={dropdownRef}
-                    className='rounded-xl border border-slate-200 bg-white shadow-2xl'
-                    onMouseDown={(e: any) => e.stopPropagation()}
-                    onClick={(e: any) => e.stopPropagation()}
-                    style={{
-                        position: 'fixed',
-                        top: `${dropdownPortalPos.top}px`,
-                        left: `${dropdownPortalPos.left}px`,
-                        width: 'max-content',
-                        minWidth: `${dropdownPortalPos.width}px`,
-                        maxWidth: '500px',
+                    <div
+                        ref={dropdownRef}
+                        className='rounded-xl border border-slate-200 bg-white shadow-2xl'
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: `${dropdownPortalPos.top}px`,
+                            left: `${dropdownPortalPos.left}px`,
+                            width: 'max-content',
+                            minWidth: `${dropdownPortalPos.width}px`,
+                            maxWidth: '500px',
                             zIndex: 10000,
-                    }}
-                >
+                        }}
+                    >
                         <div className='absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200'></div>
-                    <div className='relative z-10 flex flex-col'>
+                        <div className='relative z-10 flex flex-col'>
                             <div
                                 className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto'
                                 style={{maxHeight: '200px'}}
                             >
-                            {loading ? (
-                                <div className='px-3 py-2 text-slate-500 text-center'>
-                                    Loading…
-                                </div>
-                            ) : (
-                                (() => {
-                                    // Filter options that match the query (show all if no query)
-                                    const filteredOptions = query.trim()
+                                {loading ? (
+                                    <div className='px-3 py-2 text-slate-500 text-center'>
+                                        Loading…
+                                    </div>
+                                ) : (
+                                    (() => {
+                                        // Filter options that match the query (show all if no query)
+                                        const filteredOptions = query.trim()
                                             ? options
                                                   .filter(
                                                       (opt) =>
@@ -3459,7 +3458,7 @@ function AsyncChipSelect({
                                                       const queryLower =
                                                           query.toLowerCase();
 
-                                            // Prioritize starts with matches
+                                                      // Prioritize starts with matches
                                                       const aStartsWith =
                                                           aLower.startsWith(
                                                               queryLower,
@@ -3483,10 +3482,10 @@ function AsyncChipSelect({
                                                       return aLower.localeCompare(
                                                           bLower,
                                                       );
-                                        })
-                                        : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
+                                                  })
+                                            : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
 
-                                    // Check if query exactly matches an existing option
+                                        // Check if query exactly matches an existing option
                                         const exactMatch =
                                             query.trim() &&
                                             allOptions.length > 0
@@ -3499,17 +3498,17 @@ function AsyncChipSelect({
                                                   )
                                                 : null;
 
-                                    // Show + button if query is entered and no exact match
+                                        // Show + button if query is entered and no exact match
                                         const showCreateNew =
                                             query.trim() &&
                                             (allOptions.length === 0 ||
                                                 !exactMatch);
 
-                                    return (
-                                        <>
+                                        return (
+                                            <>
                                                 {filteredOptions.map(
                                                     (opt, idx) => {
-                                                const palette = [
+                                                        const palette = [
                                                             {
                                                                 bg: 'bg-blue-100',
                                                                 hover: 'hover:bg-blue-200',
@@ -3530,16 +3529,16 @@ function AsyncChipSelect({
                                                                 hover: 'hover:bg-indigo-200',
                                                                 text: 'text-indigo-700',
                                                             },
-                                                ];
+                                                        ];
                                                         const tone =
                                                             palette[
                                                                 idx %
                                                                     palette.length
                                                             ];
 
-                                                return (
-                                                    <motion.div
-                                                        key={opt.id}
+                                                        return (
+                                                            <motion.div
+                                                                key={opt.id}
                                                                 initial={{
                                                                     scale: 0.98,
                                                                     opacity: 0,
@@ -3557,17 +3556,17 @@ function AsyncChipSelect({
                                                                     stiffness: 400,
                                                                     damping: 25,
                                                                 }}
-                                                        className='relative group'
-                                                    >
-                                                        <div
-                                                            className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
+                                                                className='relative group'
+                                                            >
+                                                                <div
+                                                                    className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
                                                                     style={{
                                                                         wordBreak:
                                                                             'keep-all',
                                                                         whiteSpace:
                                                                             'nowrap',
                                                                     }}
-                                                            onClick={() => {
+                                                                    onClick={() => {
                                                                         onChange(
                                                                             opt.name,
                                                                         );
@@ -3580,23 +3579,23 @@ function AsyncChipSelect({
                                                                         setOpen(
                                                                             false,
                                                                         );
-                                                            }}
-                                                        >
+                                                                    }}
+                                                                >
                                                                     <span className='relative z-10 flex-1'>
                                                                         {
                                                                             opt.name
                                                                         }
                                                                     </span>
-                                                            <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
-                                                        </div>
-                                                    </motion.div>
-                                                );
+                                                                    <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+                                                                </div>
+                                                            </motion.div>
+                                                        );
                                                     },
                                                 )}
 
-                                            {/* Add button inside scrollable area */}
-                                            {showCreateNew && (
-                                                <motion.div
+                                                {/* Add button inside scrollable area */}
+                                                {showCreateNew && (
+                                                    <motion.div
                                                         initial={{
                                                             scale: 0.98,
                                                             opacity: 0,
@@ -3605,48 +3604,48 @@ function AsyncChipSelect({
                                                             scale: 1,
                                                             opacity: 1,
                                                         }}
-                                                    className='mt-2 border-t border-slate-200 pt-2'
-                                                >
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            addNew();
-                                                        }}
-                                                        className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
-                                                        type='button'
+                                                        className='mt-2 border-t border-slate-200 pt-2'
                                                     >
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                addNew();
+                                                            }}
+                                                            className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                                            type='button'
+                                                        >
                                                             + Add &quot;
                                                             {query.trim()}&quot;
-                                                    </button>
-                                                </motion.div>
-                                            )}
+                                                        </button>
+                                                    </motion.div>
+                                                )}
 
-                                            {/* Show "No results" message */}
+                                                {/* Show "No results" message */}
                                                 {filteredOptions.length === 0 &&
                                                     !showCreateNew &&
                                                     allOptions.length > 0 && (
-                                                <div className='px-3 py-2 text-slate-500 text-center'>
-                                                    No matches
-                                                </div>
-                                            )}
+                                                        <div className='px-3 py-2 text-slate-500 text-center'>
+                                                            No matches
+                                                        </div>
+                                                    )}
 
-                                            {/* Show empty state */}
+                                                {/* Show empty state */}
                                                 {filteredOptions.length === 0 &&
                                                     !query.trim() &&
                                                     !loading &&
                                                     allOptions.length === 0 && (
-                                                <div className='px-3 py-2 text-slate-500 text-center'>
-                                                    No value found
-                                                </div>
-                                            )}
-                                        </>
-                                    );
-                                })()
-                            )}
+                                                        <div className='px-3 py-2 text-slate-500 text-center'>
+                                                            No value found
+                                                        </div>
+                                                    )}
+                                            </>
+                                        );
+                                    })()
+                                )}
+                            </div>
                         </div>
-                    </div>
-                </div>,
+                    </div>,
                     document.body,
                 )}
         </div>
@@ -3716,18 +3715,35 @@ function AsyncChipSelectCredentialName({
             if (params.toString()) credentialsUrl += `?${params.toString()}`;
 
             console.log('📡 [CredentialName] Calling API:', credentialsUrl);
-            const allData =
-                (await api.get<Array<{id: string; name: string}>>(
-                    credentialsUrl,
-                )) || [];
+            const rawData = await api.get<Array<{id: string; name: string}>>(
+                credentialsUrl,
+            );
+
+            // Validate response is actually an array (not HTML string)
+            if (
+                !rawData ||
+                typeof rawData === 'string' ||
+                !Array.isArray(rawData)
+            ) {
+                console.error(
+                    '❌ [CredentialName] API returned invalid data (not an array):',
+                    typeof rawData,
+                );
+                setAllOptions([]);
+                setLoading(false);
+                return;
+            }
+
+            const allData = rawData;
             console.log(
                 `✅ [CredentialName] API call successful, got ${allData.length} items:`,
                 allData,
             );
             // Transform the data to match expected format if needed
             const transformedData = allData
+                .filter((item: any) => item && typeof item === 'object') // Filter out non-objects
                 .map((item: any) => ({
-                id: item.id || item.credentialId || String(Math.random()),
+                    id: item.id || item.credentialId || String(Math.random()),
                     name: item.name || item.credentialName || '',
                 }))
                 .filter((item: any) => item.name); // Filter out items without names
@@ -3794,12 +3810,12 @@ function AsyncChipSelectCredentialName({
     // Check if query is a new value
     const isNewValuePending = useCallback(
         (queryValue: string): boolean => {
-        if (!queryValue.trim()) return false;
+            if (!queryValue.trim()) return false;
             const exactMatch = allOptions.find(
                 (opt) =>
                     opt.name.toLowerCase() === queryValue.toLowerCase().trim(),
-        );
-        return !exactMatch;
+            );
+            return !exactMatch;
         },
         [allOptions],
     );
@@ -4476,40 +4492,40 @@ function AsyncChipSelectCredentialName({
             {open &&
                 dropdownPortalPos &&
                 createPortal(
-                <div
-                    ref={dropdownRef}
-                    className='rounded-xl border border-slate-200 bg-white shadow-2xl'
-                    onMouseDown={(e: any) => e.stopPropagation()}
-                    onClick={(e: any) => e.stopPropagation()}
-                    style={{
-                        position: 'fixed',
-                        top: `${dropdownPortalPos.top}px`,
-                        left: `${dropdownPortalPos.left}px`,
-                        width: 'max-content',
-                        minWidth: `${dropdownPortalPos.width}px`,
-                        maxWidth: '500px',
+                    <div
+                        ref={dropdownRef}
+                        className='rounded-xl border border-slate-200 bg-white shadow-2xl'
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: `${dropdownPortalPos.top}px`,
+                            left: `${dropdownPortalPos.left}px`,
+                            width: 'max-content',
+                            minWidth: `${dropdownPortalPos.width}px`,
+                            maxWidth: '500px',
                             zIndex: 10000,
-                    }}
-                >
+                        }}
+                    >
                         <div className='absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200'></div>
-                    <div className='relative z-10 flex flex-col'>
+                        <div className='relative z-10 flex flex-col'>
                             <div
                                 className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto'
                                 style={{maxHeight: '200px'}}
                             >
-                            {(() => {
+                                {(() => {
                                     console.log(
                                         '🎨 [CredentialName] Rendering dropdown content',
                                         {
-                                    query: query.trim(),
-                                    optionsLength: options.length,
-                                    allOptionsLength: allOptions.length,
+                                            query: query.trim(),
+                                            optionsLength: options.length,
+                                            allOptionsLength: allOptions.length,
                                             loading,
                                         },
                                     );
 
-                                // Filter options that match the query (show all if no query) - exactly like AssignedUserGroupTable
-                                const filteredOptions = query.trim()
+                                    // Filter options that match the query (show all if no query) - exactly like AssignedUserGroupTable
+                                    const filteredOptions = query.trim()
                                         ? options
                                               .filter(
                                                   (opt) =>
@@ -4532,7 +4548,7 @@ function AsyncChipSelectCredentialName({
                                                   const queryLower =
                                                       query.toLowerCase();
 
-                                        // Prioritize starts with matches
+                                                  // Prioritize starts with matches
                                                   const aStartsWith =
                                                       aLower.startsWith(
                                                           queryLower,
@@ -4556,15 +4572,15 @@ function AsyncChipSelectCredentialName({
                                                   return aLower.localeCompare(
                                                       bLower,
                                                   );
-                                    })
-                                    : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
+                                              })
+                                        : options.slice(0, 50); // Show first 50 options if no query to avoid performance issues
 
                                     console.log(
                                         '🔍 [CredentialName] filteredOptions:',
                                         filteredOptions,
                                     );
 
-                                // Check if query exactly matches an existing option - always check allOptions when available (database source of truth)
+                                    // Check if query exactly matches an existing option - always check allOptions when available (database source of truth)
                                     const exactMatch =
                                         query.trim() && allOptions.length > 0
                                             ? allOptions.find(
@@ -4579,8 +4595,8 @@ function AsyncChipSelectCredentialName({
                                     console.log(
                                         '🎯 [CredentialName] exactMatch check:',
                                         {
-                                    query: query.trim(),
-                                    allOptionsLength: allOptions.length,
+                                            query: query.trim(),
+                                            allOptionsLength: allOptions.length,
                                             exactMatch:
                                                 exactMatch?.name || null,
                                             allOptionsSample: allOptions
@@ -4589,9 +4605,9 @@ function AsyncChipSelectCredentialName({
                                         },
                                     );
 
-                                // Show + button if:
-                                // 1. Query is entered
-                                // 2. Either allOptions is empty (still loading) OR no exact match found in database
+                                    // Show + button if:
+                                    // 1. Query is entered
+                                    // 2. Either allOptions is empty (still loading) OR no exact match found in database
                                     const showCreateNew =
                                         query.trim() &&
                                         (allOptions.length === 0 ||
@@ -4600,16 +4616,16 @@ function AsyncChipSelectCredentialName({
                                     console.log(
                                         '➕ [CredentialName] showCreateNew calculation:',
                                         {
-                                    queryTrimmed: query.trim(),
-                                    queryHasValue: !!query.trim(),
+                                            queryTrimmed: query.trim(),
+                                            queryHasValue: !!query.trim(),
                                             allOptionsEmpty:
                                                 allOptions.length === 0,
-                                    exactMatchFound: !!exactMatch,
+                                            exactMatchFound: !!exactMatch,
                                             showCreateNew,
                                         },
                                     );
 
-                                // Show loading only if loading AND no query entered yet
+                                    // Show loading only if loading AND no query entered yet
                                     if (
                                         loading &&
                                         allOptions.length === 0 &&
@@ -4618,14 +4634,14 @@ function AsyncChipSelectCredentialName({
                                         console.log(
                                             '⏳ [CredentialName] Showing loading message',
                                         );
-                                    return (
-                                        <div className='px-3 py-2 text-slate-500 text-center'>
-                                            Loading…
-                                        </div>
-                                    );
-                                }
+                                        return (
+                                            <div className='px-3 py-2 text-slate-500 text-center'>
+                                                Loading…
+                                            </div>
+                                        );
+                                    }
 
-                                // Only show "No matches" if there are no filtered options AND no new value to create AND not loading AND allOptions is loaded
+                                    // Only show "No matches" if there are no filtered options AND no new value to create AND not loading AND allOptions is loaded
                                     if (
                                         filteredOptions.length === 0 &&
                                         !showCreateNew &&
@@ -4635,14 +4651,14 @@ function AsyncChipSelectCredentialName({
                                         console.log(
                                             '🚫 [CredentialName] Showing "No matches" message',
                                         );
-                                    return (
-                                        <div className='px-3 py-2 text-slate-500 text-center'>
-                                            No matches
-                                        </div>
-                                    );
-                                }
+                                        return (
+                                            <div className='px-3 py-2 text-slate-500 text-center'>
+                                                No matches
+                                            </div>
+                                        );
+                                    }
 
-                                // Show empty state when no values exist in database
+                                    // Show empty state when no values exist in database
                                     if (
                                         filteredOptions.length === 0 &&
                                         !query.trim() &&
@@ -4652,19 +4668,19 @@ function AsyncChipSelectCredentialName({
                                         console.log(
                                             '📭 [CredentialName] Showing "No value found" message',
                                         );
-                                    return (
-                                        <div className='px-3 py-2 text-slate-500 text-center'>
-                                            No value found
-                                        </div>
-                                    );
-                                }
+                                        return (
+                                            <div className='px-3 py-2 text-slate-500 text-center'>
+                                                No value found
+                                            </div>
+                                        );
+                                    }
 
                                     console.log(
                                         '✅ [CredentialName] Rendering dropdown items and + button',
                                         {
                                             filteredOptionsCount:
                                                 filteredOptions.length,
-                                    showCreateNew,
+                                            showCreateNew,
                                             showCreateNewType:
                                                 typeof showCreateNew,
                                             showCreateNewValue:
@@ -4672,10 +4688,10 @@ function AsyncChipSelectCredentialName({
                                         },
                                     );
 
-                                return (
-                                    <>
-                                        {filteredOptions.map((opt, idx) => {
-                                            const palette = [
+                                    return (
+                                        <>
+                                            {filteredOptions.map((opt, idx) => {
+                                                const palette = [
                                                     {
                                                         bg: 'bg-blue-100',
                                                         hover: 'hover:bg-blue-200',
@@ -4696,15 +4712,15 @@ function AsyncChipSelectCredentialName({
                                                         hover: 'hover:bg-indigo-200',
                                                         text: 'text-indigo-700',
                                                     },
-                                            ];
+                                                ];
                                                 const tone =
                                                     palette[
                                                         idx % palette.length
                                                     ];
 
-                                            return (
-                                                <motion.div
-                                                    key={opt.id}
+                                                return (
+                                                    <motion.div
+                                                        key={opt.id}
                                                         initial={{
                                                             scale: 0.98,
                                                             opacity: 0,
@@ -4722,18 +4738,18 @@ function AsyncChipSelectCredentialName({
                                                             stiffness: 400,
                                                             damping: 25,
                                                         }}
-                                                    className='relative group'
-                                                >
-                                                    <div
-                                                        className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
+                                                        className='relative group'
+                                                    >
+                                                        <div
+                                                            className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
                                                             style={{
                                                                 wordBreak:
                                                                     'keep-all',
                                                                 whiteSpace:
                                                                     'nowrap',
                                                             }}
-                                                        onClick={() => {
-                                                            // Double-check for duplicate (safeguard, shouldn't happen since list is already filtered)
+                                                            onClick={() => {
+                                                                // Double-check for duplicate (safeguard, shouldn't happen since list is already filtered)
                                                                 const isDuplicate =
                                                                     userGroups.some(
                                                                         (ug) =>
@@ -4743,7 +4759,7 @@ function AsyncChipSelectCredentialName({
                                                                             opt.name
                                                                                 .toLowerCase()
                                                                                 .trim(),
-                                                            );
+                                                                    );
 
                                                                 if (
                                                                     isDuplicate
@@ -4755,8 +4771,8 @@ function AsyncChipSelectCredentialName({
                                                                     alert(
                                                                         `Group name "${opt.name}" already exists in the table. Please use a different name.`,
                                                                     );
-                                                                return;
-                                                            }
+                                                                    return;
+                                                                }
 
                                                                 onChange(
                                                                     opt.name,
@@ -4764,17 +4780,17 @@ function AsyncChipSelectCredentialName({
                                                                 setCurrent(
                                                                     opt.name,
                                                                 );
-                                                            setQuery('');
-                                                            setOpen(false);
+                                                                setQuery('');
+                                                                setOpen(false);
                                                                 setHasPendingNewValue(
                                                                     false,
                                                                 );
 
-                                                            // Focus the chip after selecting option so Tab navigation works - exactly like AssignedUserGroupTable
+                                                                // Focus the chip after selecting option so Tab navigation works - exactly like AssignedUserGroupTable
                                                                 setTimeout(
                                                                     () => {
-                                                                try {
-                                                                    // Find the chip element (which now has tabIndex=0 and is focusable)
+                                                                        try {
+                                                                            // Find the chip element (which now has tabIndex=0 and is focusable)
                                                                             const chipElement =
                                                                                 containerRef.current?.querySelector(
                                                                                     'span[tabindex="0"]',
@@ -4782,34 +4798,34 @@ function AsyncChipSelectCredentialName({
                                                                             if (
                                                                                 chipElement
                                                                             ) {
-                                                                        chipElement.focus();
+                                                                                chipElement.focus();
                                                                                 console.log(
                                                                                     '🎯 [CredentialName] Focused chip after dropdown selection',
                                                                                 );
-                                                                    }
-                                                                } catch (e) {
+                                                                            }
+                                                                        } catch (e) {
                                                                             console.log(
                                                                                 '🎯 [CredentialName] Error focusing chip after dropdown selection:',
                                                                                 e,
                                                                             );
-                                                                }
+                                                                        }
                                                                     },
                                                                     100,
                                                                 ); // Small delay to ensure React state updates are complete
-                                                        }}
-                                                    >
+                                                            }}
+                                                        >
                                                             <span className='relative z-10 flex-1'>
                                                                 {opt.name}
                                                             </span>
-                                                        <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
-                                                    </div>
-                                                </motion.div>
-                                            );
-                                        })}
+                                                            <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+                                                        </div>
+                                                    </motion.div>
+                                                );
+                                            })}
 
-                                        {/* Add button inside scrollable area - exactly like AssignedUserGroupTable */}
-                                        {showCreateNew && (
-                                            <motion.div
+                                            {/* Add button inside scrollable area - exactly like AssignedUserGroupTable */}
+                                            {showCreateNew && (
+                                                <motion.div
                                                     initial={{
                                                         scale: 0.98,
                                                         opacity: 0,
@@ -4818,34 +4834,34 @@ function AsyncChipSelectCredentialName({
                                                         scale: 1,
                                                         opacity: 1,
                                                     }}
-                                                className='mt-2 border-t border-slate-200 pt-2'
-                                            >
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
+                                                    className='mt-2 border-t border-slate-200 pt-2'
+                                                >
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
                                                             console.log(
                                                                 '🖱️ [CredentialName] + button clicked for:',
                                                                 query.trim(),
                                                             );
-                                                        addNew();
-                                                    }}
-                                                    className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
-                                                    type='button'
-                                                >
+                                                            addNew();
+                                                        }}
+                                                        className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                                        type='button'
+                                                    >
                                                         + Add &quot;
                                                         {query.trim()}&quot;
-                                                </button>
-                                            </motion.div>
-                                        )}
-                                    </>
-                                );
-                            })()}
+                                                    </button>
+                                                </motion.div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+                            </div>
                         </div>
-                    </div>
-                </div>,
+                    </div>,
                     document.body,
-            )}
+                )}
         </div>
     );
 }
@@ -4910,9 +4926,9 @@ function AsyncChipSelectEntity({
                 console.log(
                     '⚠️ [Entity] Missing dependencies, clearing options',
                     {
-                    hasAccountId: !!selectedAccountId,
-                    hasEnterprise: !!selectedEnterprise,
-                    selectedAccountIdValue: selectedAccountId,
+                        hasAccountId: !!selectedAccountId,
+                        hasEnterprise: !!selectedEnterprise,
+                        selectedAccountIdValue: selectedAccountId,
                         selectedEnterpriseValue: selectedEnterprise,
                     },
                 );
@@ -5094,12 +5110,12 @@ function AsyncChipSelectEntity({
                         '🔍 [Entity/Workstream] Filtering out item - does not match account/enterprise:',
                         {
                             workstreamName: item.workstreamName,
-                        entityName: item.entityName,
-                        itemAccountId: item.accountId,
-                        itemEnterpriseId: item.enterpriseId,
-                        expectedAccountId: actualAccountId,
-                        expectedEnterpriseId: enterpriseId,
-                        matchesAccount,
+                            entityName: item.entityName,
+                            itemAccountId: item.accountId,
+                            itemEnterpriseId: item.enterpriseId,
+                            expectedAccountId: actualAccountId,
+                            expectedEnterpriseId: enterpriseId,
+                            matchesAccount,
                             matchesEnterprise,
                         },
                     );
@@ -5180,12 +5196,12 @@ function AsyncChipSelectEntity({
     // Check if query is a new value
     const isNewValuePending = useCallback(
         (queryValue: string): boolean => {
-        if (!queryValue.trim()) return false;
+            if (!queryValue.trim()) return false;
             const exactMatch = allOptions.find(
                 (opt) =>
                     opt.name.toLowerCase() === queryValue.toLowerCase().trim(),
-        );
-        return !exactMatch;
+            );
+            return !exactMatch;
         },
         [allOptions],
     );
@@ -5313,9 +5329,9 @@ function AsyncChipSelectEntity({
                 name,
                 'with values:',
                 {
-                actualAccountId,
-                actualEnterprise,
-                actualAccountName,
+                    actualAccountId,
+                    actualEnterprise,
+                    actualAccountName,
                     enterpriseId: window.localStorage.getItem(
                         'selectedEnterpriseId',
                     ),
@@ -5324,9 +5340,9 @@ function AsyncChipSelectEntity({
             const created = await api.post<
                 {id: string; entityName: string} | any
             >('/api/global-settings', {
-                    entityName: name,
-                    accountId: actualAccountId,
-                    accountName: actualAccountName,
+                entityName: name,
+                accountId: actualAccountId,
+                accountName: actualAccountName,
                 enterpriseId: window.localStorage.getItem(
                     'selectedEnterpriseId',
                 ),
@@ -5563,7 +5579,7 @@ function AsyncChipSelectEntity({
                                                 const chipElement =
                                                     document.querySelector(
                                                         `[data-row-id="${currentRowId}"][data-col="entity"] span[tabindex="0"]`,
-                                                ) as HTMLElement;
+                                                    ) as HTMLElement;
                                                 if (chipElement) {
                                                     chipElement.focus();
                                                 }
@@ -5680,23 +5696,23 @@ function AsyncChipSelectEntity({
             {open &&
                 dropdownPortalPos &&
                 createPortal(
-                <div
-                    ref={dropdownRef}
-                    className='rounded-xl border border-slate-200 bg-white shadow-2xl'
-                    onMouseDown={(e: any) => e.stopPropagation()}
-                    onClick={(e: any) => e.stopPropagation()}
-                    style={{
-                        position: 'fixed',
-                        top: `${dropdownPortalPos.top}px`,
-                        left: `${dropdownPortalPos.left}px`,
-                        width: 'max-content',
-                        minWidth: `${dropdownPortalPos.width}px`,
-                        maxWidth: '500px',
+                    <div
+                        ref={dropdownRef}
+                        className='rounded-xl border border-slate-200 bg-white shadow-2xl'
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: `${dropdownPortalPos.top}px`,
+                            left: `${dropdownPortalPos.left}px`,
+                            width: 'max-content',
+                            minWidth: `${dropdownPortalPos.width}px`,
+                            maxWidth: '500px',
                             zIndex: 10000,
-                    }}
-                >
+                        }}
+                    >
                         <div className='absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200'></div>
-                    <div className='relative z-10 flex flex-col'>
+                        <div className='relative z-10 flex flex-col'>
                             <div
                                 className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto'
                                 style={{maxHeight: '200px'}}
@@ -5709,7 +5725,7 @@ function AsyncChipSelectEntity({
                                     </div>
                                 ) : (
                                     (() => {
-                                const filteredOptions = query.trim()
+                                        const filteredOptions = query.trim()
                                             ? options
                                                   .filter(
                                                       (opt) =>
@@ -5752,8 +5768,8 @@ function AsyncChipSelectEntity({
                                                       return aLower.localeCompare(
                                                           bLower,
                                                       );
-                                    })
-                                    : options.slice(0, 50);
+                                                  })
+                                            : options.slice(0, 50);
 
                                         const exactMatch =
                                             query.trim() &&
@@ -5767,8 +5783,8 @@ function AsyncChipSelectEntity({
                                                   )
                                                 : null;
 
-                                // Disable "Add new" functionality for Entity field
-                                const showCreateNew = false;
+                                        // Disable "Add new" functionality for Entity field
+                                        const showCreateNew = false;
 
                                         if (
                                             filteredOptions.length === 0 &&
@@ -5776,12 +5792,12 @@ function AsyncChipSelectEntity({
                                             !loading &&
                                             allOptions.length > 0
                                         ) {
-                                    return (
-                                        <div className='px-3 py-2 text-slate-500 text-center'>
-                                            No matches
-                                        </div>
-                                    );
-                                }
+                                            return (
+                                                <div className='px-3 py-2 text-slate-500 text-center'>
+                                                    No matches
+                                                </div>
+                                            );
+                                        }
 
                                         if (
                                             filteredOptions.length === 0 &&
@@ -5789,18 +5805,18 @@ function AsyncChipSelectEntity({
                                             !loading &&
                                             allOptions.length === 0
                                         ) {
-                                    return (
-                                        <div className='px-3 py-2 text-slate-500 text-center'>
-                                            No value found
-                                        </div>
-                                    );
-                                }
+                                            return (
+                                                <div className='px-3 py-2 text-slate-500 text-center'>
+                                                    No value found
+                                                </div>
+                                            );
+                                        }
 
-                                return (
-                                    <>
+                                        return (
+                                            <>
                                                 {filteredOptions.map(
                                                     (opt, idx) => {
-                                            const palette = [
+                                                        const palette = [
                                                             {
                                                                 bg: 'bg-blue-100',
                                                                 hover: 'hover:bg-blue-200',
@@ -5821,16 +5837,16 @@ function AsyncChipSelectEntity({
                                                                 hover: 'hover:bg-indigo-200',
                                                                 text: 'text-indigo-700',
                                                             },
-                                            ];
+                                                        ];
                                                         const tone =
                                                             palette[
                                                                 idx %
                                                                     palette.length
                                                             ];
 
-                                            return (
-                                                <motion.div
-                                                    key={opt.id}
+                                                        return (
+                                                            <motion.div
+                                                                key={opt.id}
                                                                 initial={{
                                                                     scale: 0.98,
                                                                     opacity: 0,
@@ -5848,17 +5864,17 @@ function AsyncChipSelectEntity({
                                                                     stiffness: 400,
                                                                     damping: 25,
                                                                 }}
-                                                    className='relative group'
-                                                >
-                                                    <div
-                                                        className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
+                                                                className='relative group'
+                                                            >
+                                                                <div
+                                                                    className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
                                                                     style={{
                                                                         wordBreak:
                                                                             'keep-all',
                                                                         whiteSpace:
                                                                             'nowrap',
                                                                     }}
-                                                        onClick={() => {
+                                                                    onClick={() => {
                                                                         onChange(
                                                                             opt.name,
                                                                         );
@@ -5875,15 +5891,15 @@ function AsyncChipSelectEntity({
                                                                             false,
                                                                         );
 
-                                                            // Focus the chip after clicking dropdown option so Tab navigation works
+                                                                        // Focus the chip after clicking dropdown option so Tab navigation works
                                                                         setTimeout(
                                                                             () => {
-                                                                try {
+                                                                                try {
                                                                                     if (
                                                                                         inputRef.current
                                                                                     ) {
-                                                                        inputRef.current.blur();
-                                                                    }
+                                                                                        inputRef.current.blur();
+                                                                                    }
                                                                                     const currentElement =
                                                                                         inputRef.current ||
                                                                                         (document.activeElement as HTMLElement);
@@ -5901,38 +5917,38 @@ function AsyncChipSelectEntity({
                                                                                         const chipElement =
                                                                                             document.querySelector(
                                                                                                 `[data-row-id="${currentRowId}"][data-col="entity"] span[tabindex="0"]`,
-                                                                        ) as HTMLElement;
+                                                                                            ) as HTMLElement;
                                                                                         if (
                                                                                             chipElement
                                                                                         ) {
-                                                                            chipElement.focus();
-                                                                        }
-                                                                    }
-                                                                } catch (error) {
+                                                                                            chipElement.focus();
+                                                                                        }
+                                                                                    }
+                                                                                } catch (error) {
                                                                                     console.error(
                                                                                         'Failed to focus chip after dropdown selection:',
                                                                                         error,
                                                                                     );
-                                                                }
+                                                                                }
                                                                             },
                                                                             50,
                                                                         );
-                                                        }}
-                                                    >
+                                                                    }}
+                                                                >
                                                                     <span className='relative z-10 flex-1'>
                                                                         {
                                                                             opt.name
                                                                         }
                                                                     </span>
-                                                        <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
-                                                    </div>
-                                                </motion.div>
-                                            );
+                                                                    <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+                                                                </div>
+                                                            </motion.div>
+                                                        );
                                                     },
                                                 )}
 
-                                        {showCreateNew && (
-                                            <motion.div
+                                                {showCreateNew && (
+                                                    <motion.div
                                                         initial={{
                                                             scale: 0.98,
                                                             opacity: 0,
@@ -5941,31 +5957,31 @@ function AsyncChipSelectEntity({
                                                             scale: 1,
                                                             opacity: 1,
                                                         }}
-                                                className='mt-2 border-t border-slate-200 pt-2'
-                                            >
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        addNew();
-                                                    }}
-                                                    className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
-                                                    type='button'
-                                                >
+                                                        className='mt-2 border-t border-slate-200 pt-2'
+                                                    >
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                addNew();
+                                                            }}
+                                                            className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                                            type='button'
+                                                        >
                                                             + Add &quot;
                                                             {query.trim()}&quot;
-                                                </button>
-                                            </motion.div>
-                                        )}
-                                    </>
-                                );
+                                                        </button>
+                                                    </motion.div>
+                                                )}
+                                            </>
+                                        );
                                     })()
                                 )}
+                            </div>
                         </div>
-                    </div>
-                </div>,
+                    </div>,
                     document.body,
-            )}
+                )}
         </div>
     );
 }
@@ -6037,14 +6053,14 @@ function AsyncChipSelectProduct({
             // Get account data with licenses to find products for this account and enterprise
             const accountData =
                 (await api.get<{
-                id: string;
-                accountName: string;
-                licenses: Array<{
                     id: string;
-                    enterprise: string;
-                    product: string;
-                    service: string;
-                }>;
+                    accountName: string;
+                    licenses: Array<{
+                        id: string;
+                        enterprise: string;
+                        product: string;
+                        service: string;
+                    }>;
                 }>(`/api/accounts/${selectedAccountId}`)) || null;
 
             if (!accountData || !accountData.licenses) {
@@ -6059,14 +6075,14 @@ function AsyncChipSelectProduct({
             // Extract unique product names from licenses that match the selected enterprise
             const uniqueProducts = Array.from(
                 new Set(
-                accountData.licenses
+                    accountData.licenses
                         .filter((license) => {
-                        // Match by enterprise name if available, otherwise show all products for this account
+                            // Match by enterprise name if available, otherwise show all products for this account
                             return (
                                 !selectedEnterprise ||
                                 license.enterprise === selectedEnterprise
                             );
-                    })
+                        })
                         .map((license) => license.product)
                         .filter((product) => product && product.trim() !== ''),
                 ),
@@ -6092,12 +6108,12 @@ function AsyncChipSelectProduct({
     // Check if query is a new value
     const isNewValuePending = useCallback(
         (queryValue: string): boolean => {
-        if (!queryValue.trim()) return false;
+            if (!queryValue.trim()) return false;
             const exactMatch = allOptions.find(
                 (opt) =>
                     opt.name.toLowerCase() === queryValue.toLowerCase().trim(),
-        );
-        return !exactMatch;
+            );
+            return !exactMatch;
         },
         [allOptions],
     );
@@ -6439,7 +6455,7 @@ function AsyncChipSelectProduct({
                                                 const chipElement =
                                                     document.querySelector(
                                                         `[data-row-id="${currentRowId}"][data-col="product"] span[tabindex="0"]`,
-                                                ) as HTMLElement;
+                                                    ) as HTMLElement;
                                                 if (chipElement) {
                                                     chipElement.focus();
                                                 }
@@ -6562,23 +6578,23 @@ function AsyncChipSelectProduct({
             {open &&
                 dropdownPortalPos &&
                 createPortal(
-                <div
-                    ref={dropdownRef}
-                    className='rounded-xl border border-slate-200 bg-white shadow-2xl'
-                    onMouseDown={(e: any) => e.stopPropagation()}
-                    onClick={(e: any) => e.stopPropagation()}
-                    style={{
-                        position: 'fixed',
-                        top: `${dropdownPortalPos.top}px`,
-                        left: `${dropdownPortalPos.left}px`,
-                        width: 'max-content',
-                        minWidth: `${dropdownPortalPos.width}px`,
-                        maxWidth: '500px',
+                    <div
+                        ref={dropdownRef}
+                        className='rounded-xl border border-slate-200 bg-white shadow-2xl'
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: `${dropdownPortalPos.top}px`,
+                            left: `${dropdownPortalPos.left}px`,
+                            width: 'max-content',
+                            minWidth: `${dropdownPortalPos.width}px`,
+                            maxWidth: '500px',
                             zIndex: 10000,
-                    }}
-                >
+                        }}
+                    >
                         <div className='absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200'></div>
-                    <div className='relative z-10 flex flex-col'>
+                        <div className='relative z-10 flex flex-col'>
                             <div
                                 className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto'
                                 style={{maxHeight: '200px'}}
@@ -6589,13 +6605,13 @@ function AsyncChipSelectProduct({
                                     <div className='px-3 py-2 text-slate-500 text-center'>
                                         Loading…
                                     </div>
-                            ) : !selectedEnterprise ? (
+                                ) : !selectedEnterprise ? (
                                     <div className='px-3 py-2 text-slate-500 text-center'>
                                         Please select Enterprise first
                                     </div>
                                 ) : (
                                     (() => {
-                                const filteredOptions = query.trim()
+                                        const filteredOptions = query.trim()
                                             ? options
                                                   .filter(
                                                       (opt) =>
@@ -6638,8 +6654,8 @@ function AsyncChipSelectProduct({
                                                       return aLower.localeCompare(
                                                           bLower,
                                                       );
-                                    })
-                                    : options.slice(0, 50);
+                                                  })
+                                            : options.slice(0, 50);
 
                                         const exactMatch =
                                             query.trim() &&
@@ -6662,12 +6678,12 @@ function AsyncChipSelectProduct({
                                             query.trim() &&
                                             !loading
                                         ) {
-                                    return (
+                                            return (
                                                 <div className='px-3 py-2 text-slate-500 text-center'>
                                                     No matches found
                                                 </div>
-                                    );
-                                }
+                                            );
+                                        }
 
                                         if (
                                             filteredOptions.length === 0 &&
@@ -6675,18 +6691,18 @@ function AsyncChipSelectProduct({
                                             !loading &&
                                             allOptions.length === 0
                                         ) {
-                                    return (
+                                            return (
                                                 <div className='px-3 py-2 text-slate-500 text-center'>
                                                     No value found
                                                 </div>
-                                    );
-                                }
+                                            );
+                                        }
 
-                                return (
-                                    <>
+                                        return (
+                                            <>
                                                 {filteredOptions.map(
                                                     (opt, idx) => {
-                                            const palette = [
+                                                        const palette = [
                                                             {
                                                                 bg: 'bg-blue-100',
                                                                 hover: 'hover:bg-blue-200',
@@ -6707,16 +6723,16 @@ function AsyncChipSelectProduct({
                                                                 hover: 'hover:bg-indigo-200',
                                                                 text: 'text-indigo-700',
                                                             },
-                                            ];
+                                                        ];
                                                         const tone =
                                                             palette[
                                                                 idx %
                                                                     palette.length
                                                             ];
 
-                                            return (
-                                                <motion.div
-                                                    key={opt.id}
+                                                        return (
+                                                            <motion.div
+                                                                key={opt.id}
                                                                 initial={{
                                                                     scale: 0.98,
                                                                     opacity: 0,
@@ -6734,17 +6750,17 @@ function AsyncChipSelectProduct({
                                                                     stiffness: 400,
                                                                     damping: 25,
                                                                 }}
-                                                    className='relative group'
-                                                >
-                                                    <div
-                                                        className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
+                                                                className='relative group'
+                                                            >
+                                                                <div
+                                                                    className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
                                                                     style={{
                                                                         wordBreak:
                                                                             'keep-all',
                                                                         whiteSpace:
                                                                             'nowrap',
                                                                     }}
-                                                        onClick={() => {
+                                                                    onClick={() => {
                                                                         onChange(
                                                                             opt.name,
                                                                         );
@@ -6761,15 +6777,15 @@ function AsyncChipSelectProduct({
                                                                             false,
                                                                         );
 
-                                                            // Focus the chip after clicking dropdown option so Tab navigation works
+                                                                        // Focus the chip after clicking dropdown option so Tab navigation works
                                                                         setTimeout(
                                                                             () => {
-                                                                try {
+                                                                                try {
                                                                                     if (
                                                                                         inputRef.current
                                                                                     ) {
-                                                                        inputRef.current.blur();
-                                                                    }
+                                                                                        inputRef.current.blur();
+                                                                                    }
                                                                                     const currentElement =
                                                                                         inputRef.current ||
                                                                                         (document.activeElement as HTMLElement);
@@ -6787,38 +6803,38 @@ function AsyncChipSelectProduct({
                                                                                         const chipElement =
                                                                                             document.querySelector(
                                                                                                 `[data-row-id="${currentRowId}"][data-col="product"] span[tabindex="0"]`,
-                                                                        ) as HTMLElement;
+                                                                                            ) as HTMLElement;
                                                                                         if (
                                                                                             chipElement
                                                                                         ) {
-                                                                            chipElement.focus();
-                                                                        }
-                                                                    }
-                                                                } catch (error) {
+                                                                                            chipElement.focus();
+                                                                                        }
+                                                                                    }
+                                                                                } catch (error) {
                                                                                     console.error(
                                                                                         'Failed to focus chip after dropdown selection:',
                                                                                         error,
                                                                                     );
-                                                                }
+                                                                                }
                                                                             },
                                                                             50,
                                                                         );
-                                                        }}
-                                                    >
+                                                                    }}
+                                                                >
                                                                     <span className='relative z-10 flex-1'>
                                                                         {
                                                                             opt.name
                                                                         }
                                                                     </span>
-                                                        <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
-                                                    </div>
-                                                </motion.div>
-                                            );
+                                                                    <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+                                                                </div>
+                                                            </motion.div>
+                                                        );
                                                     },
                                                 )}
 
-                                        {showCreateNew && (
-                                            <motion.div
+                                                {showCreateNew && (
+                                                    <motion.div
                                                         initial={{
                                                             scale: 0.98,
                                                             opacity: 0,
@@ -6827,31 +6843,31 @@ function AsyncChipSelectProduct({
                                                             scale: 1,
                                                             opacity: 1,
                                                         }}
-                                                className='mt-2 border-t border-slate-200 pt-2'
-                                            >
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        addNew();
-                                                    }}
-                                                    className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
-                                                    type='button'
-                                                >
+                                                        className='mt-2 border-t border-slate-200 pt-2'
+                                                    >
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                addNew();
+                                                            }}
+                                                            className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                                            type='button'
+                                                        >
                                                             + Add &quot;
                                                             {query.trim()}&quot;
-                                                </button>
-                                            </motion.div>
-                                        )}
-                                    </>
-                                );
+                                                        </button>
+                                                    </motion.div>
+                                                )}
+                                            </>
+                                        );
                                     })()
                                 )}
+                            </div>
                         </div>
-                    </div>
-                </div>,
+                    </div>,
                     document.body,
-            )}
+                )}
         </div>
     );
 }
@@ -6913,68 +6929,68 @@ function AsyncChipSelectService({
                     ? overrideProduct
                     : selectedProduct;
 
-        setLoading(true);
-        try {
-            // Service field is disabled until Product is selected
+            setLoading(true);
+            try {
+                // Service field is disabled until Product is selected
                 if (
                     !selectedAccountId ||
                     !selectedEnterprise ||
                     !productToUse
                 ) {
-                setAllOptions([]);
-                setLoading(false);
-                return;
-            }
+                    setAllOptions([]);
+                    setLoading(false);
+                    return;
+                }
 
-            // Get account data to find services from licenses
+                // Get account data to find services from licenses
                 const accountData = (await api.get<{
-                licenses: Array<{
-                    enterprise: string;
-                    product: string;
-                    service: string;
-                }>;
+                    licenses: Array<{
+                        enterprise: string;
+                        product: string;
+                        service: string;
+                    }>;
                 }>(`/api/accounts/${selectedAccountId}`)) || {licenses: []};
 
-            // Extract unique service names from licenses that match selected enterprise and product
+                // Extract unique service names from licenses that match selected enterprise and product
                 const uniqueServices = Array.from(
                     new Set(
-                accountData.licenses
+                        accountData.licenses
                             .filter(
                                 (license) =>
-                        license.enterprise === selectedEnterprise &&
-                        license.product === productToUse &&
+                                    license.enterprise === selectedEnterprise &&
+                                    license.product === productToUse &&
                                     license.service &&
                                     license.service.trim() !== '',
-                    )
+                            )
                             .map((license) => license.service.trim()),
                     ),
                 );
 
-            // Convert to the expected format
-            const allData = uniqueServices.map((service, index) => ({
-                id: `service-${index}`,
+                // Convert to the expected format
+                const allData = uniqueServices.map((service, index) => ({
+                    id: `service-${index}`,
                     name: service,
-            }));
+                }));
 
-            setAllOptions(allData);
-        } catch (error) {
-            console.error('Failed to load services:', error);
-            setAllOptions([]);
-        } finally {
-            setLoading(false);
-        }
+                setAllOptions(allData);
+            } catch (error) {
+                console.error('Failed to load services:', error);
+                setAllOptions([]);
+            } finally {
+                setLoading(false);
+            }
         },
         [selectedEnterprise, selectedProduct, selectedAccountId],
     );
 
     const isNewValuePending = useCallback(
         (queryValue: string): boolean => {
-        if (!queryValue.trim()) return false;
+            if (!queryValue.trim()) return false;
             const exactMatch = allOptions.find(
                 (opt) =>
                     opt.name.toLowerCase() === queryValue.toLowerCase().trim(),
-        );
-        return !exactMatch;
+            );
+            return !exactMatch;
         },
         [allOptions],
     );
@@ -7383,7 +7399,7 @@ function AsyncChipSelectService({
                                                 const chipElement =
                                                     document.querySelector(
                                                         `[data-row-id="${currentRowId}"][data-col="service"] span[tabindex="0"]`,
-                                                ) as HTMLElement;
+                                                    ) as HTMLElement;
                                                 if (chipElement) {
                                                     chipElement.focus();
                                                 }
@@ -7505,23 +7521,23 @@ function AsyncChipSelectService({
             {open &&
                 dropdownPortalPos &&
                 createPortal(
-                <div
-                    ref={dropdownRef}
-                    className='rounded-xl border border-slate-200 bg-white shadow-2xl'
-                    onMouseDown={(e: any) => e.stopPropagation()}
-                    onClick={(e: any) => e.stopPropagation()}
-                    style={{
-                        position: 'fixed',
-                        top: `${dropdownPortalPos.top}px`,
-                        left: `${dropdownPortalPos.left}px`,
-                        width: 'max-content',
-                        minWidth: `${dropdownPortalPos.width}px`,
-                        maxWidth: '500px',
+                    <div
+                        ref={dropdownRef}
+                        className='rounded-xl border border-slate-200 bg-white shadow-2xl'
+                        onMouseDown={(e: any) => e.stopPropagation()}
+                        onClick={(e: any) => e.stopPropagation()}
+                        style={{
+                            position: 'fixed',
+                            top: `${dropdownPortalPos.top}px`,
+                            left: `${dropdownPortalPos.left}px`,
+                            width: 'max-content',
+                            minWidth: `${dropdownPortalPos.width}px`,
+                            maxWidth: '500px',
                             zIndex: 10000,
-                    }}
-                >
+                        }}
+                    >
                         <div className='absolute -top-2 left-6 h-3 w-3 rotate-45 bg-white border-t border-l border-slate-200'></div>
-                    <div className='relative z-10 flex flex-col'>
+                        <div className='relative z-10 flex flex-col'>
                             <div
                                 className='py-1 text-[12px] px-3 space-y-2 overflow-y-auto'
                                 style={{maxHeight: '200px'}}
@@ -7532,17 +7548,17 @@ function AsyncChipSelectService({
                                     <div className='px-3 py-2 text-slate-500 text-center'>
                                         Loading…
                                     </div>
-                            ) : !selectedEnterprise ? (
+                                ) : !selectedEnterprise ? (
                                     <div className='px-3 py-2 text-slate-500 text-center'>
                                         Please select Enterprise first
                                     </div>
-                            ) : !selectedProduct ? (
+                                ) : !selectedProduct ? (
                                     <div className='px-3 py-2 text-slate-500 text-center'>
                                         Please select Product first
                                     </div>
                                 ) : (
                                     (() => {
-                                const filteredOptions = query.trim()
+                                        const filteredOptions = query.trim()
                                             ? options
                                                   .filter(
                                                       (opt) =>
@@ -7585,8 +7601,8 @@ function AsyncChipSelectService({
                                                       return aLower.localeCompare(
                                                           bLower,
                                                       );
-                                    })
-                                    : options.slice(0, 50);
+                                                  })
+                                            : options.slice(0, 50);
 
                                         const exactMatch =
                                             query.trim() &&
@@ -7609,12 +7625,12 @@ function AsyncChipSelectService({
                                             query.trim() &&
                                             !loading
                                         ) {
-                                    return (
+                                            return (
                                                 <div className='px-3 py-2 text-slate-500 text-center'>
                                                     No matches found
                                                 </div>
-                                    );
-                                }
+                                            );
+                                        }
 
                                         if (
                                             filteredOptions.length === 0 &&
@@ -7622,18 +7638,18 @@ function AsyncChipSelectService({
                                             !loading &&
                                             allOptions.length === 0
                                         ) {
-                                    return (
+                                            return (
                                                 <div className='px-3 py-2 text-slate-500 text-center'>
                                                     No value found
                                                 </div>
-                                    );
-                                }
+                                            );
+                                        }
 
-                                return (
-                                    <>
+                                        return (
+                                            <>
                                                 {filteredOptions.map(
                                                     (opt, idx) => {
-                                            const palette = [
+                                                        const palette = [
                                                             {
                                                                 bg: 'bg-blue-100',
                                                                 hover: 'hover:bg-blue-200',
@@ -7654,16 +7670,16 @@ function AsyncChipSelectService({
                                                                 hover: 'hover:bg-indigo-200',
                                                                 text: 'text-indigo-700',
                                                             },
-                                            ];
+                                                        ];
                                                         const tone =
                                                             palette[
                                                                 idx %
                                                                     palette.length
                                                             ];
 
-                                            return (
-                                                <motion.div
-                                                    key={opt.id}
+                                                        return (
+                                                            <motion.div
+                                                                key={opt.id}
                                                                 initial={{
                                                                     scale: 0.98,
                                                                     opacity: 0,
@@ -7681,17 +7697,17 @@ function AsyncChipSelectService({
                                                                     stiffness: 400,
                                                                     damping: 25,
                                                                 }}
-                                                    className='relative group'
-                                                >
-                                                    <div
-                                                        className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
+                                                                className='relative group'
+                                                            >
+                                                                <div
+                                                                    className={`w-full rounded-lg px-3 py-2.5 ${tone.bg} ${tone.hover} ${tone.text} transition-all duration-200 font-medium shadow-sm hover:shadow-md relative overflow-visible flex items-center justify-between cursor-pointer`}
                                                                     style={{
                                                                         wordBreak:
                                                                             'keep-all',
                                                                         whiteSpace:
                                                                             'nowrap',
                                                                     }}
-                                                        onClick={() => {
+                                                                    onClick={() => {
                                                                         onChange(
                                                                             opt.name,
                                                                         );
@@ -7708,15 +7724,15 @@ function AsyncChipSelectService({
                                                                             false,
                                                                         );
 
-                                                            // Focus the chip after clicking dropdown option so Tab navigation works
+                                                                        // Focus the chip after clicking dropdown option so Tab navigation works
                                                                         setTimeout(
                                                                             () => {
-                                                                try {
+                                                                                try {
                                                                                     if (
                                                                                         inputRef.current
                                                                                     ) {
-                                                                        inputRef.current.blur();
-                                                                    }
+                                                                                        inputRef.current.blur();
+                                                                                    }
                                                                                     const currentElement =
                                                                                         inputRef.current ||
                                                                                         (document.activeElement as HTMLElement);
@@ -7734,38 +7750,38 @@ function AsyncChipSelectService({
                                                                                         const chipElement =
                                                                                             document.querySelector(
                                                                                                 `[data-row-id="${currentRowId}"][data-col="service"] span[tabindex="0"]`,
-                                                                        ) as HTMLElement;
+                                                                                            ) as HTMLElement;
                                                                                         if (
                                                                                             chipElement
                                                                                         ) {
-                                                                            chipElement.focus();
-                                                                        }
-                                                                    }
-                                                                } catch (error) {
+                                                                                            chipElement.focus();
+                                                                                        }
+                                                                                    }
+                                                                                } catch (error) {
                                                                                     console.error(
                                                                                         'Failed to focus chip after dropdown selection:',
                                                                                         error,
                                                                                     );
-                                                                }
+                                                                                }
                                                                             },
                                                                             50,
                                                                         );
-                                                        }}
-                                                    >
+                                                                    }}
+                                                                >
                                                                     <span className='relative z-10 flex-1'>
                                                                         {
                                                                             opt.name
                                                                         }
                                                                     </span>
-                                                        <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
-                                                    </div>
-                                                </motion.div>
-                                            );
+                                                                    <div className='absolute inset-0 bg-gradient-to-r from-white/0 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200' />
+                                                                </div>
+                                                            </motion.div>
+                                                        );
                                                     },
                                                 )}
 
-                                        {showCreateNew && (
-                                            <motion.div
+                                                {showCreateNew && (
+                                                    <motion.div
                                                         initial={{
                                                             scale: 0.98,
                                                             opacity: 0,
@@ -7774,31 +7790,31 @@ function AsyncChipSelectService({
                                                             scale: 1,
                                                             opacity: 1,
                                                         }}
-                                                className='mt-2 border-t border-slate-200 pt-2'
-                                            >
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        addNew();
-                                                    }}
-                                                    className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
-                                                    type='button'
-                                                >
+                                                        className='mt-2 border-t border-slate-200 pt-2'
+                                                    >
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                addNew();
+                                                            }}
+                                                            className='w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 transition-colors duration-150 rounded-lg'
+                                                            type='button'
+                                                        >
                                                             + Add &quot;
                                                             {query.trim()}&quot;
-                                                </button>
-                                            </motion.div>
-                                        )}
-                                    </>
-                                );
+                                                        </button>
+                                                    </motion.div>
+                                                )}
+                                            </>
+                                        );
                                     })()
                                 )}
+                            </div>
                         </div>
-                    </div>
-                </div>,
+                    </div>,
                     document.body,
-            )}
+                )}
         </div>
     );
 }
@@ -8738,64 +8754,64 @@ function SortableCredentialRow({
 const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
     (
         {
-    rows,
-    onEdit,
-    onDelete,
-    title,
-    groupByExternal,
-    onGroupByChange,
-    hideControls,
-    visibleColumns,
-    highlightQuery,
-    customColumnLabels,
-    enableDropdownChips = false,
-    dropdownOptions = {},
-    onUpdateField,
-    hideRowExpansion = false,
-    enableInlineEditing = true,
-    incompleteRowIds = [],
-    showValidationErrors = false,
-    hasBlankRow = false,
-    externalFieldErrors = {},
-    onDropdownOptionUpdate,
-    onNewItemCreated,
-    onShowAllColumns,
-    compressingRowId = null,
-    foldingRowId = null,
-    compressingLicenseId = null,
-    foldingLicenseId = null,
-    triggerValidation = false,
-    onValidationComplete,
-    onAddNewRow,
-    externalSortColumn,
-    externalSortDirection,
-    onSortChange,
-    isAIInsightsPanelOpen = false,
-    selectedEnterprise = '',
-    selectedEnterpriseId = '',
-    selectedAccountId = '',
-    selectedAccountName = '',
-    onLicenseValidationChange,
-    onLicenseDelete,
-    onCompleteLicenseDeletion,
-    onOpenAddressModal,
-    onOpenUserGroupModal,
-    onOpenScopeModal,
-    onShowStartDateProtectionModal,
-    onDuplicateDetected,
+            rows,
+            onEdit,
+            onDelete,
+            title,
+            groupByExternal,
+            onGroupByChange,
+            hideControls,
+            visibleColumns,
+            highlightQuery,
+            customColumnLabels,
+            enableDropdownChips = false,
+            dropdownOptions = {},
+            onUpdateField,
+            hideRowExpansion = false,
+            enableInlineEditing = true,
+            incompleteRowIds = [],
+            showValidationErrors = false,
+            hasBlankRow = false,
+            externalFieldErrors = {},
+            onDropdownOptionUpdate,
+            onNewItemCreated,
+            onShowAllColumns,
+            compressingRowId = null,
+            foldingRowId = null,
+            compressingLicenseId = null,
+            foldingLicenseId = null,
+            triggerValidation = false,
+            onValidationComplete,
+            onAddNewRow,
+            externalSortColumn,
+            externalSortDirection,
+            onSortChange,
+            isAIInsightsPanelOpen = false,
+            selectedEnterprise = '',
+            selectedEnterpriseId = '',
+            selectedAccountId = '',
+            selectedAccountName = '',
+            onLicenseValidationChange,
+            onLicenseDelete,
+            onCompleteLicenseDeletion,
+            onOpenAddressModal,
+            onOpenUserGroupModal,
+            onOpenScopeModal,
+            onShowStartDateProtectionModal,
+            onDuplicateDetected,
         },
         ref,
     ) => {
-    // Debug: Log received props
-    console.log('🐛 [ManageUserGroupsTable] Props received:', {
-        selectedEnterprise,
-        selectedEnterpriseId,
-        selectedAccountId,
-        selectedAccountName,
+        // Debug: Log received props
+        console.log('🐛 [ManageUserGroupsTable] Props received:', {
+            selectedEnterprise,
+            selectedEnterpriseId,
+            selectedAccountId,
+            selectedAccountName,
             rowsLength: rows.length,
-    });
+        });
 
-    // Local validation state to track rows with errors
+        // Local validation state to track rows with errors
         const [validationErrors, setValidationErrors] = useState<Set<string>>(
             new Set(),
         );
@@ -8803,65 +8819,65 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
             [key: string]: Record<string, string>;
         }>({});
 
-    // Global validation modal state
-    const [globalValidationModal, setGlobalValidationModal] = useState<{
-        open: boolean;
-        field: string;
-        message: string;
-        rowId: string;
+        // Global validation modal state
+        const [globalValidationModal, setGlobalValidationModal] = useState<{
+            open: boolean;
+            field: string;
+            message: string;
+            rowId: string;
         }>({open: false, field: '', message: '', rowId: ''});
 
-    // Scope Config Modal state
-    const [showScopeModal, setShowScopeModal] = useState(false);
+        // Scope Config Modal state
+        const [showScopeModal, setShowScopeModal] = useState(false);
         const [selectedRoleForScope, setSelectedRoleForScope] =
             useState<CredentialRow | null>(null);
 
-    // Global validation modal helper functions
+        // Global validation modal helper functions
         const showGlobalValidationModal = useCallback(
             (rowId: string, field: string, message: string) => {
-        setGlobalValidationModal({
-            open: true,
-            field,
-            message,
+                setGlobalValidationModal({
+                    open: true,
+                    field,
+                    message,
                     rowId,
-        });
+                });
             },
             [],
         );
 
-    const hideGlobalValidationModal = useCallback(() => {
-        // Ensure the field error remains set after modal closes
+        const hideGlobalValidationModal = useCallback(() => {
+            // Ensure the field error remains set after modal closes
             if (
                 globalValidationModal.field &&
                 globalValidationModal.message &&
                 globalValidationModal.rowId
             ) {
-            // Keep the validation error active so field stays red
+                // Keep the validation error active so field stays red
                 setFieldValidationErrors((prev) => {
                     const newErrors = {...prev};
-                if (!newErrors[globalValidationModal.rowId]) {
-                    newErrors[globalValidationModal.rowId] = {};
-                }
+                    if (!newErrors[globalValidationModal.rowId]) {
+                        newErrors[globalValidationModal.rowId] = {};
+                    }
                     newErrors[globalValidationModal.rowId][
                         globalValidationModal.field
                     ] = globalValidationModal.message;
-                return newErrors;
-            });
-        }
+                    return newErrors;
+                });
+            }
 
-        // Return focus to the problematic field
-        if (globalValidationModal.rowId && globalValidationModal.field) {
-            setTimeout(() => {
-                const fieldInput = document.querySelector(
+            // Return focus to the problematic field
+            if (globalValidationModal.rowId && globalValidationModal.field) {
+                setTimeout(() => {
+                    const fieldInput = document.querySelector(
                         `[data-row-id="${globalValidationModal.rowId}"][data-col="${globalValidationModal.field}"] input`,
-                ) as HTMLInputElement;
+                    ) as HTMLInputElement;
 
-                if (fieldInput) {
-                    fieldInput.focus();
-                    fieldInput.select(); // Select all text to help user fix the issue
-                }
-            }, 100);
-        }
+                    if (fieldInput) {
+                        fieldInput.focus();
+                        fieldInput.select(); // Select all text to help user fix the issue
+                    }
+                }, 100);
+            }
 
             setGlobalValidationModal({
                 open: false,
@@ -8875,48 +8891,48 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
             globalValidationModal.message,
         ]);
 
-    // Enhanced validation functions (same as TechnicalUserModal)
+        // Enhanced validation functions (same as TechnicalUserModal)
         const validateName = useCallback(
             (
                 name: string,
                 fieldName: string,
             ): {isValid: boolean; error?: string} => {
-        const trimmed = name.trim();
+                const trimmed = name.trim();
 
-        if (!trimmed) {
+                if (!trimmed) {
                     return {isValid: false, error: `${fieldName} is required`};
-        }
+                }
 
-        if (trimmed.length < 2) {
+                if (trimmed.length < 2) {
                     return {
                         isValid: false,
                         error: `${fieldName} must be at least 2 characters long`,
                     };
-        }
+                }
 
-        if (trimmed.length > 50) {
+                if (trimmed.length > 50) {
                     return {
                         isValid: false,
                         error: `${fieldName} must not exceed 50 characters`,
                     };
-        }
+                }
 
-        // Allow letters, spaces, hyphens, and apostrophes
-        const nameRegex = /^[a-zA-Z\s\-']+$/;
-        if (!nameRegex.test(trimmed)) {
+                // Allow letters, spaces, hyphens, and apostrophes
+                const nameRegex = /^[a-zA-Z\s\-']+$/;
+                if (!nameRegex.test(trimmed)) {
                     return {
                         isValid: false,
                         error: `${fieldName} can only contain letters, spaces, hyphens, and apostrophes`,
                     };
-        }
+                }
 
-        // Check for multiple consecutive spaces or special characters
-        if (/\s{2,}|[-']{2,}/.test(trimmed)) {
+                // Check for multiple consecutive spaces or special characters
+                if (/\s{2,}|[-']{2,}/.test(trimmed)) {
                     return {
                         isValid: false,
                         error: `${fieldName} cannot contain consecutive spaces or special characters`,
                     };
-        }
+                }
 
                 return {isValid: true};
             },
@@ -8925,26 +8941,26 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
 
         const validateEmail = useCallback(
             (email: string): {isValid: boolean; error?: string} => {
-        const trimmed = email.trim();
+                const trimmed = email.trim();
 
-        if (!trimmed) {
+                if (!trimmed) {
                     return {isValid: false, error: 'Email address is required'};
-        }
+                }
 
-        // More comprehensive email regex
+                // More comprehensive email regex
                 const emailRegex =
                     /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
-        if (!emailRegex.test(trimmed)) {
+                if (!emailRegex.test(trimmed)) {
                     return {
                         isValid: false,
                         error: 'Please enter a valid email address',
                     };
-        }
+                }
 
-        if (trimmed.length > 254) {
+                if (trimmed.length > 254) {
                     return {isValid: false, error: 'Email address is too long'};
-        }
+                }
 
                 return {isValid: true};
             },
@@ -8953,78 +8969,78 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
 
         const validatePassword = useCallback(
             (password: string): {isValid: boolean; error?: string} => {
-        if (!password) {
+                if (!password) {
                     return {isValid: false, error: 'Password is required'};
-        }
+                }
 
-        if (password.length < 8) {
+                if (password.length < 8) {
                     return {
                         isValid: false,
                         error: 'Password must be at least 8 characters long',
                     };
-        }
+                }
 
-        if (password.length > 128) {
+                if (password.length > 128) {
                     return {
                         isValid: false,
                         error: 'Password must not exceed 128 characters',
                     };
-        }
+                }
 
-        // Check for at least one uppercase letter
-        if (!/[A-Z]/.test(password)) {
+                // Check for at least one uppercase letter
+                if (!/[A-Z]/.test(password)) {
                     return {
                         isValid: false,
                         error: 'Password must contain at least one uppercase letter',
                     };
-        }
+                }
 
-        // Check for at least one lowercase letter
-        if (!/[a-z]/.test(password)) {
+                // Check for at least one lowercase letter
+                if (!/[a-z]/.test(password)) {
                     return {
                         isValid: false,
                         error: 'Password must contain at least one lowercase letter',
                     };
-        }
+                }
 
-        // Check for at least one number
-        if (!/\d/.test(password)) {
+                // Check for at least one number
+                if (!/\d/.test(password)) {
                     return {
                         isValid: false,
                         error: 'Password must contain at least one number',
                     };
-        }
+                }
 
-        // Check for at least one special character
-        if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+                // Check for at least one special character
+                if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
                     return {
                         isValid: false,
                         error: 'Password must contain at least one special character (!@#$%^&*...)',
                     };
-        }
+                }
 
-        // Check for common weak patterns
-        const commonPatterns = [
-            /(.)\1{2,}/, // Three or more consecutive identical characters
-            /123|234|345|456|567|678|789|890/, // Sequential numbers
-            /abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz/i, // Sequential letters
-        ];
+                // Check for common weak patterns
+                const commonPatterns = [
+                    /(.)\1{2,}/, // Three or more consecutive identical characters
+                    /123|234|345|456|567|678|789|890/, // Sequential numbers
+                    /abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz/i, // Sequential letters
+                ];
 
-        for (const pattern of commonPatterns) {
-            if (pattern.test(password)) {
+                for (const pattern of commonPatterns) {
+                    if (pattern.test(password)) {
                         return {
                             isValid: false,
                             error: 'Password contains common patterns and is not secure enough',
                         };
-            }
-        }
+                    }
+                }
 
                 return {isValid: true};
             },
             [],
         );
 
-    // Field validation handlers
+        // Field validation handlers
         const handleFieldValidation = useCallback(
             (
                 rowId: string,
@@ -9041,29 +9057,29 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
 
                 setFieldValidationErrors((prev) => {
                     const newErrors = {...prev};
-            if (!newErrors[rowId]) {
-                newErrors[rowId] = {};
-            }
+                    if (!newErrors[rowId]) {
+                        newErrors[rowId] = {};
+                    }
 
-            if (!validation.isValid) {
+                    if (!validation.isValid) {
                         newErrors[rowId][fieldName] =
                             validation.error || `${fieldName} is invalid`;
-            } else {
-                delete newErrors[rowId][fieldName];
-                if (Object.keys(newErrors[rowId]).length === 0) {
-                    delete newErrors[rowId];
-                }
-            }
+                    } else {
+                        delete newErrors[rowId][fieldName];
+                        if (Object.keys(newErrors[rowId]).length === 0) {
+                            delete newErrors[rowId];
+                        }
+                    }
 
-            return newErrors;
-        });
+                    return newErrors;
+                });
 
-        return validation.isValid;
+                return validation.isValid;
             },
             [],
         );
 
-    // State for license deletion
+        // State for license deletion
         const [pendingDeleteLicenseId, setPendingDeleteLicenseId] = useState<
             string | null
         >(null);
@@ -9071,27 +9087,27 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
             string | null
         >(null);
 
-    // Temporary empty rowLicenses to prevent errors during cleanup
-    const rowLicenses: Record<string, any[]> = {};
-    const setRowLicenses = () => {}; // Placeholder
+        // Temporary empty rowLicenses to prevent errors during cleanup
+        const rowLicenses: Record<string, any[]> = {};
+        const setRowLicenses = () => {}; // Placeholder
         const [expandedRows, setExpandedRows] = useState<Set<string>>(
             new Set<string>(),
         );
 
-    // Validation state
+        // Validation state
 
-    // Use refs to track previous values and avoid infinite loops
-    const prevRowsRef = useRef<CredentialRow[]>([]);
-    const orderRef = useRef<string[]>([]);
+        // Use refs to track previous values and avoid infinite loops
+        const prevRowsRef = useRef<CredentialRow[]>([]);
+        const orderRef = useRef<string[]>([]);
 
-    // Keep local state for editing, but initialize it safely
+        // Keep local state for editing, but initialize it safely
         const [localEdits, setLocalEdits] = useState<
             Record<string, Partial<CredentialRow>>
         >({});
 
-    // Use useMemo for base derived state with stable comparison
+        // Use useMemo for base derived state with stable comparison
         const {baseLocalRows, order} = useMemo(() => {
-        // Check if rows array length or IDs have changed (shallow comparison)
+            // Check if rows array length or IDs have changed (shallow comparison)
             const currentIds = rows.map((r) => r.id).join(',');
             const prevIds = prevRowsRef.current.map((r) => r.id).join(',');
 
@@ -9099,141 +9115,141 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                 currentIds === prevIds &&
                 rows.length === prevRowsRef.current.length
             ) {
-            // No changes detected - return cached data
-            return {
-                baseLocalRows: prevRowsRef.current,
+                // No changes detected - return cached data
+                return {
+                    baseLocalRows: prevRowsRef.current,
                     order: orderRef.current,
-            };
-        }
+                };
+            }
 
-        // Update refs and create new state
+            // Update refs and create new state
             prevRowsRef.current = rows.map((r) => ({...r}));
             const newOrder = rows.map((r) => r.id);
-        orderRef.current = newOrder;
+            orderRef.current = newOrder;
 
-        return {
-            baseLocalRows: prevRowsRef.current,
-                order: newOrder,
-        };
-    }, [rows]);
-
-    // Apply local edits to create final localRows with stable reference
-    const localRows = useMemo(() => {
-            return baseLocalRows.map((row) => {
-            const edits = localEdits[row.id];
-            if (!edits || Object.keys(edits).length === 0) {
-                return row; // Return same reference if no edits
-            }
             return {
-                ...row,
-                    ...edits,
+                baseLocalRows: prevRowsRef.current,
+                order: newOrder,
             };
-        });
-    }, [baseLocalRows, localEdits]);
+        }, [rows]);
 
-    // Helper function to validate email format
-    const isValidEmail = (email: string): boolean => {
-        if (!email || !email.trim()) return false;
+        // Apply local edits to create final localRows with stable reference
+        const localRows = useMemo(() => {
+            return baseLocalRows.map((row) => {
+                const edits = localEdits[row.id];
+                if (!edits || Object.keys(edits).length === 0) {
+                    return row; // Return same reference if no edits
+                }
+                return {
+                    ...row,
+                    ...edits,
+                };
+            });
+        }, [baseLocalRows, localEdits]);
 
-        const trimmed = email.trim();
+        // Helper function to validate email format
+        const isValidEmail = (email: string): boolean => {
+            if (!email || !email.trim()) return false;
 
-        // Length validation
-        if (trimmed.length < 5 || trimmed.length > 254) return false;
+            const trimmed = email.trim();
 
-        // RFC 5322 compliant email regex
+            // Length validation
+            if (trimmed.length < 5 || trimmed.length > 254) return false;
+
+            // RFC 5322 compliant email regex
             const emailRegex =
                 /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
-        return emailRegex.test(trimmed);
-    };
+            return emailRegex.test(trimmed);
+        };
 
-    // Helper function to check if a field is missing/invalid
-    const isFieldMissing = (row: CredentialRow, field: string): boolean => {
-        switch (field) {
-            case 'credentialName':
+        // Helper function to check if a field is missing/invalid
+        const isFieldMissing = (row: CredentialRow, field: string): boolean => {
+            switch (field) {
+                case 'credentialName':
                     return (
                         !row.credentialName || row.credentialName.trim() === ''
                     );
-            case 'entity':
-                return !row.entity || row.entity.trim() === '';
-            case 'product':
-                return !row.product || row.product.trim() === '';
-            case 'service':
-                return !row.service || row.service.trim() === '';
-            default:
+                case 'entity':
+                    return !row.entity || row.entity.trim() === '';
+                case 'product':
+                    return !row.product || row.product.trim() === '';
+                case 'service':
+                    return !row.service || row.service.trim() === '';
+                default:
+                    return false;
+            }
+        };
+
+        // Enhanced helper function to check if a cell should be highlighted as missing
+        const isCellMissing = (rowId: string, field: string) => {
+            const row = localRows.find((r) => r.id === rowId);
+            if (!row) return false;
+
+            // Don't show validation errors for new rows that were just added (not part of the incomplete rows list)
+            // This prevents new rows from inheriting validation styling from previous validation sessions
+            if (showValidationErrors && !incompleteRowIds.includes(rowId)) {
                 return false;
-        }
-    };
+            }
 
-    // Enhanced helper function to check if a cell should be highlighted as missing
-    const isCellMissing = (rowId: string, field: string) => {
-        const row = localRows.find((r) => r.id === rowId);
-        if (!row) return false;
-
-        // Don't show validation errors for new rows that were just added (not part of the incomplete rows list)
-        // This prevents new rows from inheriting validation styling from previous validation sessions
-        if (showValidationErrors && !incompleteRowIds.includes(rowId)) {
-            return false;
-        }
-
-        // Check if this row has validation errors (either from parent or local validation)
+            // Check if this row has validation errors (either from parent or local validation)
             const hasValidationError =
                 showValidationErrors &&
                 (incompleteRowIds.includes(rowId) ||
                     validationErrors.has(rowId));
 
-        if (!hasValidationError) return false;
+            if (!hasValidationError) return false;
 
-        // When validation is explicitly triggered (showValidationErrors=true), show errors for all incomplete fields
-        // including completely blank rows
-        return isFieldMissing(row, field);
-    };
+            // When validation is explicitly triggered (showValidationErrors=true), show errors for all incomplete fields
+            // including completely blank rows
+            return isFieldMissing(row, field);
+        };
 
-    // Function to validate all rows and highlight missing fields
-    const validateAndHighlightErrors = () => {
-        const errorRowIds = new Set<string>();
-
-            localRows.forEach((row) => {
-            // Check if any required field is missing
-                if (
-                    isFieldMissing(row, 'credentialName') ||
-                isFieldMissing(row, 'entity') ||
-                isFieldMissing(row, 'product') ||
-                    isFieldMissing(row, 'service')
-                ) {
-                errorRowIds.add(row.id);
-            }
-        });
-
-        setValidationErrors(errorRowIds);
-        return errorRowIds;
-    };
-
-    // Effect to trigger validation when requested
-    useEffect(() => {
-        if (triggerValidation) {
+        // Function to validate all rows and highlight missing fields
+        const validateAndHighlightErrors = () => {
             const errorRowIds = new Set<string>();
 
-            // Use baseLocalRows with localEdits applied inline to avoid dependency issues
-                baseLocalRows.forEach((baseRow) => {
-                    const row = {...baseRow, ...(localEdits[baseRow.id] || {})};
+            localRows.forEach((row) => {
                 // Check if any required field is missing
-                    if (
-                        isFieldMissing(row, 'credentialName') ||
+                if (
+                    isFieldMissing(row, 'credentialName') ||
                     isFieldMissing(row, 'entity') ||
                     isFieldMissing(row, 'product') ||
-                        isFieldMissing(row, 'service')
-                    ) {
+                    isFieldMissing(row, 'service')
+                ) {
                     errorRowIds.add(row.id);
                 }
             });
 
             setValidationErrors(errorRowIds);
+            return errorRowIds;
+        };
 
-            if (onValidationComplete) {
-                onValidationComplete(Array.from(errorRowIds));
+        // Effect to trigger validation when requested
+        useEffect(() => {
+            if (triggerValidation) {
+                const errorRowIds = new Set<string>();
+
+                // Use baseLocalRows with localEdits applied inline to avoid dependency issues
+                baseLocalRows.forEach((baseRow) => {
+                    const row = {...baseRow, ...(localEdits[baseRow.id] || {})};
+                    // Check if any required field is missing
+                    if (
+                        isFieldMissing(row, 'credentialName') ||
+                        isFieldMissing(row, 'entity') ||
+                        isFieldMissing(row, 'product') ||
+                        isFieldMissing(row, 'service')
+                    ) {
+                        errorRowIds.add(row.id);
+                    }
+                });
+
+                setValidationErrors(errorRowIds);
+
+                if (onValidationComplete) {
+                    onValidationComplete(Array.from(errorRowIds));
+                }
             }
-        }
         }, [
             triggerValidation,
             baseLocalRows,
@@ -9241,31 +9257,31 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
             onValidationComplete,
         ]);
 
-    // Effect to highlight errors when incompleteRowIds changes from parent
-    useEffect(() => {
+        // Effect to highlight errors when incompleteRowIds changes from parent
+        useEffect(() => {
             const newValidationErrors =
                 showValidationErrors && incompleteRowIds.length > 0
-            ? new Set<string>(incompleteRowIds)
-            : new Set<string>();
+                    ? new Set<string>(incompleteRowIds)
+                    : new Set<string>();
 
-        // Only update if there's actually a change to prevent infinite loops
+            // Only update if there's actually a change to prevent infinite loops
             setValidationErrors((prev) => {
-            const prevArray = Array.from(prev).sort();
-            const newArray = Array.from(newValidationErrors).sort();
+                const prevArray = Array.from(prev).sort();
+                const newArray = Array.from(newValidationErrors).sort();
 
                 if (
                     prevArray.length !== newArray.length ||
                     prevArray.some((id, index) => id !== newArray[index])
                 ) {
-                return newValidationErrors;
-            }
-            return prev;
-        });
-    }, [incompleteRowIds, showValidationErrors]);
+                    return newValidationErrors;
+                }
+                return prev;
+            });
+        }, [incompleteRowIds, showValidationErrors]);
 
-    // If parent provides external field-level errors (e.g. format validation), apply them
-    useEffect(() => {
-        try {
+        // If parent provides external field-level errors (e.g. format validation), apply them
+        useEffect(() => {
+            try {
                 if (
                     externalFieldErrors &&
                     Object.keys(externalFieldErrors).length > 0
@@ -9278,12 +9294,12 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                         const hasChanged =
                             JSON.stringify(prev) !==
                             JSON.stringify(externalFieldErrors);
-                    return hasChanged ? (externalFieldErrors as any) : prev;
-                });
+                        return hasChanged ? (externalFieldErrors as any) : prev;
+                    });
 
                     setValidationErrors((prev) => {
-                    const prevArray = Array.from(prev).sort();
-                    const newArray = Array.from(errorRowIds).sort();
+                        const prevArray = Array.from(prev).sort();
+                        const newArray = Array.from(errorRowIds).sort();
 
                         if (
                             prevArray.length !== newArray.length ||
@@ -9291,105 +9307,105 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                 (id, index) => id !== newArray[index],
                             )
                         ) {
-                        return errorRowIds;
-                    }
-                    return prev;
-                });
-            } else if (!showValidationErrors) {
-                // clear when validation UI not active
+                            return errorRowIds;
+                        }
+                        return prev;
+                    });
+                } else if (!showValidationErrors) {
+                    // clear when validation UI not active
                     setFieldValidationErrors((prev) =>
                         Object.keys(prev).length > 0 ? {} : prev,
                     );
                     setValidationErrors((prev) =>
                         prev.size > 0 ? new Set<string>() : prev,
                     );
+                }
+            } catch (e) {
+                console.warn('Error applying field errors:', e);
             }
-        } catch (e) {
-            console.warn('Error applying field errors:', e);
+        }, [externalFieldErrors, showValidationErrors]);
+
+        const orderedItems = useMemo(
+            () =>
+                order
+                    .map((id) => localRows.find((r) => r.id === id))
+                    .filter(Boolean) as CredentialRow[],
+            [order, localRows],
+        );
+
+        // Persist helpers
+        // Debounced autosave per-row to avoid excessive API traffic
+        const saveTimersRef = useRef<Record<string, any>>({});
+        const latestRowRef = useRef<Record<string, CredentialRow>>({});
+        function schedulePersist(row: CredentialRow, delay = 600) {
+            const rowId = String(row.id);
+            latestRowRef.current[rowId] = row;
+            if (saveTimersRef.current[rowId])
+                clearTimeout(saveTimersRef.current[rowId]);
+            saveTimersRef.current[rowId] = setTimeout(() => {
+                const latest = latestRowRef.current[rowId];
+                if (latest) void persistCredentialRow(latest);
+            }, delay);
         }
-    }, [externalFieldErrors, showValidationErrors]);
-
-    const orderedItems = useMemo(
-        () =>
-            order
-                .map((id) => localRows.find((r) => r.id === id))
-                .filter(Boolean) as CredentialRow[],
-        [order, localRows],
-    );
-
-    // Persist helpers
-    // Debounced autosave per-row to avoid excessive API traffic
-    const saveTimersRef = useRef<Record<string, any>>({});
-    const latestRowRef = useRef<Record<string, CredentialRow>>({});
-    function schedulePersist(row: CredentialRow, delay = 600) {
-        const rowId = String(row.id);
-        latestRowRef.current[rowId] = row;
-        if (saveTimersRef.current[rowId])
-            clearTimeout(saveTimersRef.current[rowId]);
-        saveTimersRef.current[rowId] = setTimeout(() => {
-            const latest = latestRowRef.current[rowId];
-            if (latest) void persistCredentialRow(latest);
-        }, delay);
-    }
-    useEffect(() => {
-        return () => {
-            // cleanup pending timers on unmount without forcing save
-            const currentTimers = saveTimersRef.current;
+        useEffect(() => {
+            return () => {
+                // cleanup pending timers on unmount without forcing save
+                const currentTimers = saveTimersRef.current;
                 Object.values(currentTimers).forEach((t) => clearTimeout(t));
-        };
-    }, []);
+            };
+        }, []);
 
-    async function persistCredentialRow(row: CredentialRow) {
-        try {
-            // Skip auto-save for temporary rows - let the parent handle account linkage auto-save
-            if (String(row.id || '').startsWith('tmp-')) {
-                return;
-            }
-            const core = {
-                // Core fields for user group management
-                groupName: row.credentialName,
-                description: row.description,
-                entity: row.entity,
-                product: row.product,
-                service: row.service,
-            } as any;
-            // Map UI state into backend details JSON expected by server
-            const details = {
-                // Credential specific fields
-                credentialName: row.credentialName || '',
-                description: row.description || '',
-                entity: row.entity || '',
-                product: row.product || '',
-                service: row.service || '',
-                scope: row.scope || '',
-            } as any;
-            // Handle existing (non-temporary) rows
-            // Check if we're on user group management page
-            if (
-                typeof window !== 'undefined' &&
-                window.location.pathname.includes('/manage-user-groups')
-            ) {
-                // For user group management, update the data via the parent's onUpdateField
-                // The parent component will handle the user group data updates
-                return;
-            }
+        async function persistCredentialRow(row: CredentialRow) {
+            try {
+                // Skip auto-save for temporary rows - let the parent handle account linkage auto-save
+                if (String(row.id || '').startsWith('tmp-')) {
+                    return;
+                }
+                const core = {
+                    // Core fields for user group management
+                    groupName: row.credentialName,
+                    description: row.description,
+                    entity: row.entity,
+                    product: row.product,
+                    service: row.service,
+                } as any;
+                // Map UI state into backend details JSON expected by server
+                const details = {
+                    // Credential specific fields
+                    credentialName: row.credentialName || '',
+                    description: row.description || '',
+                    entity: row.entity || '',
+                    product: row.product || '',
+                    service: row.service || '',
+                    scope: row.scope || '',
+                } as any;
+                // Handle existing (non-temporary) rows
+                // Check if we're on user group management page
+                if (
+                    typeof window !== 'undefined' &&
+                    window.location.pathname.includes('/manage-user-groups')
+                ) {
+                    // For user group management, update the data via the parent's onUpdateField
+                    // The parent component will handle the user group data updates
+                    return;
+                }
 
-            // For user group management, all persistence is handled by parent component
-            return;
-        } catch (_e) {
-            // TODO: surface toast; keep silent here to avoid blocking UI
+                // For user group management, all persistence is handled by parent component
+                return;
+            } catch (_e) {
+                // TODO: surface toast; keep silent here to avoid blocking UI
+            }
         }
-    }
 
-    // Helper function to check for duplicate combinations
+        // Helper function to check for duplicate combinations
         const checkForDuplicate = (
             rowId: string,
             updatedRow: CredentialRow,
         ): boolean => {
-        // Check if combination of credentialName + entity + product + service already exists in another row
+            // Check if combination of credentialName + entity + product + service already exists in another row
             const duplicateRow = localRows.find(
                 (row) =>
-            row.id !== rowId && // Exclude current row
+                    row.id !== rowId && // Exclude current row
                     row.credentialName?.trim().toLowerCase() ===
                         updatedRow.credentialName?.trim().toLowerCase() &&
                     row.entity?.trim().toLowerCase() ===
@@ -9398,38 +9414,38 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                         updatedRow.product?.trim().toLowerCase() &&
                     row.service?.trim().toLowerCase() ===
                         updatedRow.service?.trim().toLowerCase() &&
-            // Only check for duplicates if all key fields are filled
-            updatedRow.credentialName?.trim() &&
-            updatedRow.entity?.trim() &&
-            updatedRow.product?.trim() &&
+                    // Only check for duplicates if all key fields are filled
+                    updatedRow.credentialName?.trim() &&
+                    updatedRow.entity?.trim() &&
+                    updatedRow.product?.trim() &&
                     updatedRow.service?.trim(),
-        );
+            );
 
-        return !!duplicateRow;
-    };
+            return !!duplicateRow;
+        };
 
         function updateRowField(
             rowId: string,
             key: keyof CredentialRow,
             value: any,
         ) {
-        let changed: CredentialRow | null = null;
+            let changed: CredentialRow | null = null;
 
-        // Update local edits instead of directly modifying localRows
+            // Update local edits instead of directly modifying localRows
             setLocalEdits((prev) => {
-            // Use baseLocalRows with current edits to avoid circular dependency
+                // Use baseLocalRows with current edits to avoid circular dependency
                 const baseRow = baseLocalRows.find((r) => r.id === rowId);
-            if (baseRow) {
-                const currentEdits = prev[rowId] || {};
+                if (baseRow) {
+                    const currentEdits = prev[rowId] || {};
                     const currentRow = {...baseRow, ...currentEdits};
-                const next = {...currentRow, [key]: value} as CredentialRow;
+                    const next = {...currentRow, [key]: value} as CredentialRow;
 
-                // If product field is being cleared, also clear the service field
-                if (key === 'product' && (!value || value.trim() === '')) {
-                    next.service = '';
-                }
+                    // If product field is being cleared, also clear the service field
+                    if (key === 'product' && (!value || value.trim() === '')) {
+                        next.service = '';
+                    }
 
-                // Check for duplicates only for key fields
+                    // Check for duplicates only for key fields
                     if (
                         [
                             'credentialName',
@@ -9438,53 +9454,53 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                             'service',
                         ].includes(key as string)
                     ) {
-                    const isDuplicate = checkForDuplicate(rowId, next);
-                    if (isDuplicate) {
-                        // Show duplicate modal via callback instead of browser alert
-                        const message = `This combination of Credential Name (${next.credentialName}), Entity (${next.entity}), Product (${next.product}), and Service (${next.service}) already exists in another row. Please use a different combination.`;
-                        if (onDuplicateDetected) {
-                            onDuplicateDetected(message);
-                        } else {
+                        const isDuplicate = checkForDuplicate(rowId, next);
+                        if (isDuplicate) {
+                            // Show duplicate modal via callback instead of browser alert
+                            const message = `This combination of Credential Name (${next.credentialName}), Entity (${next.entity}), Product (${next.product}), and Service (${next.service}) already exists in another row. Please use a different combination.`;
+                            if (onDuplicateDetected) {
+                                onDuplicateDetected(message);
+                            } else {
                                 console.error(
                                     '❌ Duplicate detected but no callback provided:',
                                     message,
                                 );
+                            }
+                            return prev; // Don't update if duplicate
                         }
-                        return prev; // Don't update if duplicate
                     }
-                }
 
-                changed = next;
+                    changed = next;
 
-                // Prepare the field updates
+                    // Prepare the field updates
                     let fieldUpdates: any = {[key]: value};
 
-                // If product field is being cleared, also clear the service field
-                if (key === 'product' && (!value || value.trim() === '')) {
-                    fieldUpdates.service = '';
-                }
+                    // If product field is being cleared, also clear the service field
+                    if (key === 'product' && (!value || value.trim() === '')) {
+                        fieldUpdates.service = '';
+                    }
 
-                return {
-                    ...prev,
-                    [rowId]: {
-                        ...(prev[rowId] || {}),
+                    return {
+                        ...prev,
+                        [rowId]: {
+                            ...(prev[rowId] || {}),
                             ...fieldUpdates,
                         },
-                };
+                    };
+                }
+                return prev;
+            });
+
+            if (changed) schedulePersist(changed);
+
+            // Also call the parent's onUpdateField function if provided
+            if (onUpdateField) {
+                onUpdateField(rowId, key as string, value);
             }
-            return prev;
-        });
-
-        if (changed) schedulePersist(changed);
-
-        // Also call the parent's onUpdateField function if provided
-        if (onUpdateField) {
-            onUpdateField(rowId, key as string, value);
         }
-    }
 
-    // Helper function to check if main row fields are complete
-    const isMainRowComplete = (row: CredentialRow): boolean => {
+        // Helper function to check if main row fields are complete
+        const isMainRowComplete = (row: CredentialRow): boolean => {
             return !!(
                 row.credentialName &&
                 row.credentialName.trim() &&
@@ -9495,16 +9511,16 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                 row.service &&
                 row.service.trim()
             );
-    };
+        };
 
-    // State for grouping
-    const [groupBy, setGroupBy] = useState<
-        'none' | 'credentialName' | 'entity' | 'product' | 'service'
-    >('none');
+        // State for grouping
+        const [groupBy, setGroupBy] = useState<
+            'none' | 'credentialName' | 'entity' | 'product' | 'service'
+        >('none');
 
-    // sync external groupBy
-    React.useEffect(() => {
-        if (groupByExternal && groupByExternal !== 'description') {
+        // sync external groupBy
+        React.useEffect(() => {
+            if (groupByExternal && groupByExternal !== 'description') {
                 setGroupBy(
                     groupByExternal as
                         | 'none'
@@ -9513,63 +9529,63 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                         | 'product'
                         | 'service',
                 );
-        }
-    }, [groupByExternal]);
+            }
+        }, [groupByExternal]);
 
-    // Clean break - license management removed
-    const columnOrder: CredentialsTableProps['visibleColumns'] = useMemo(
-        () => [
-            // User group columns
-            'credentialName',
-            'description',
-            'entity',
-            'product',
-            'service',
-            'scope',
-        ],
-        [],
-    );
+        // Clean break - license management removed
+        const columnOrder: CredentialsTableProps['visibleColumns'] = useMemo(
+            () => [
+                // User group columns
+                'credentialName',
+                'description',
+                'entity',
+                'product',
+                'service',
+                'scope',
+            ],
+            [],
+        );
 
-    // Continue with component structure
-    const cols = useMemo(() => {
-        const base = (columnOrder || []) as string[];
-        if (!visibleColumns) return base; // Only fall back to base if visibleColumns is null/undefined
-        if (visibleColumns.length === 0) return []; // If empty array, show no columns
-        const allowed = new Set(visibleColumns as string[]);
-        // Keep canonical order from columnOrder; filter by visibility
-        return base.filter((c) => allowed.has(c));
-    }, [visibleColumns, columnOrder]);
+        // Continue with component structure
+        const cols = useMemo(() => {
+            const base = (columnOrder || []) as string[];
+            if (!visibleColumns) return base; // Only fall back to base if visibleColumns is null/undefined
+            if (visibleColumns.length === 0) return []; // If empty array, show no columns
+            const allowed = new Set(visibleColumns as string[]);
+            // Keep canonical order from columnOrder; filter by visibility
+            return base.filter((c) => allowed.has(c));
+        }, [visibleColumns, columnOrder]);
 
         const colSizes = useMemo(
             () =>
                 ({
-        deleteButton: '8px', // Space for delete button with proper padding
-        groupName: '200px', // Group Name column - increased for sort arrows
-        credentialName: '220px', // Credential Name column
-        description: '250px', // Description column - needs more space
-        entity: '180px', // Entity column - increased for sort arrows
-        product: '180px', // Product column - increased for sort arrows
-        service: '180px', // Service column - increased for sort arrows
-        roles: '100px', // Roles column - icon only
+                    deleteButton: '8px', // Space for delete button with proper padding
+                    groupName: '200px', // Group Name column - increased for sort arrows
+                    credentialName: '220px', // Credential Name column
+                    description: '250px', // Description column - needs more space
+                    entity: '180px', // Entity column - increased for sort arrows
+                    product: '180px', // Product column - increased for sort arrows
+                    service: '180px', // Service column - increased for sort arrows
+                    roles: '100px', // Roles column - icon only
                 } as Record<string, string>),
             [],
         );
-    const [customColumns, setCustomColumns] = useState<string[]>([]);
-    const [colWidths, setColWidths] = useState<Record<string, number>>({});
-    const [subItems, setSubItems] = useState<Record<string, string[]>>({});
+        const [customColumns, setCustomColumns] = useState<string[]>([]);
+        const [colWidths, setColWidths] = useState<Record<string, number>>({});
+        const [subItems, setSubItems] = useState<Record<string, string[]>>({});
 
-    const [pinFirst, setPinFirst] = useState(true);
-    const firstColWidth = '140px'; // enforce fixed width for first column
-    const gridTemplate = useMemo(() => {
-        // Always include delete button column first with fixed width
-        const deleteCol = '32px'; // Fixed width for delete button
+        const [pinFirst, setPinFirst] = useState(true);
+        const firstColWidth = '140px'; // enforce fixed width for first column
+        const gridTemplate = useMemo(() => {
+            // Always include delete button column first with fixed width
+            const deleteCol = '32px'; // Fixed width for delete button
 
-        const base = cols.map((c, index) => {
-            // Use dynamic width if available, otherwise fall back to default
-            const dynamicWidth = colWidths[c];
+            const base = cols.map((c, index) => {
+                // Use dynamic width if available, otherwise fall back to default
+                const dynamicWidth = colWidths[c];
 
-            // Define minimum and maximum widths per column
-            const constraints = {
+                // Define minimum and maximum widths per column
+                const constraints = {
                     groupName: {min: 160, max: 280}, // Group Name - needs more space
                     credentialName: {min: 200, max: 350}, // Credential Name - increased size
                     description: {min: 200, max: 350}, // Description - needs even more space
@@ -9577,623 +9593,623 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                     product: {min: 140, max: 250}, // Product column
                     service: {min: 140, max: 250}, // Service column
                     roles: {min: 80, max: 120}, // Roles - icon only, smaller
-            };
+                };
 
                 const columnConstraints = constraints[
                     c as keyof typeof constraints
                 ] || {min: 140, max: 250};
 
-            if (dynamicWidth && dynamicWidth > 0) {
-                // Clamp the dynamic width within constraints for all columns
-                const clampedWidth = Math.max(
-                    columnConstraints.min,
-                        Math.min(columnConstraints.max, dynamicWidth),
-                );
-                return `${clampedWidth}px`;
-            }
-
-            // Use default size from colSizes or fallback to constraint minimum
-            const defaultSize = colSizes[c];
-            if (defaultSize) {
-                const numericSize = parseInt(defaultSize.replace('px', ''));
-                if (!isNaN(numericSize)) {
-                    const clampedSize = Math.max(
+                if (dynamicWidth && dynamicWidth > 0) {
+                    // Clamp the dynamic width within constraints for all columns
+                    const clampedWidth = Math.max(
                         columnConstraints.min,
-                            Math.min(columnConstraints.max, numericSize),
+                        Math.min(columnConstraints.max, dynamicWidth),
                     );
-                    return `${clampedSize}px`;
+                    return `${clampedWidth}px`;
                 }
-                return defaultSize;
+
+                // Use default size from colSizes or fallback to constraint minimum
+                const defaultSize = colSizes[c];
+                if (defaultSize) {
+                    const numericSize = parseInt(defaultSize.replace('px', ''));
+                    if (!isNaN(numericSize)) {
+                        const clampedSize = Math.max(
+                            columnConstraints.min,
+                            Math.min(columnConstraints.max, numericSize),
+                        );
+                        return `${clampedSize}px`;
+                    }
+                    return defaultSize;
+                }
+
+                // Final fallback - Services gets remaining space
+                if (c === 'services') {
+                    return `minmax(${columnConstraints.min}px, 1fr)`;
+                }
+                return `${columnConstraints.min}px`;
+            });
+
+            const custom = customColumns.map(() => '110px');
+            const parts = [deleteCol, ...base, ...custom].filter(Boolean);
+            return parts.join(' ');
+        }, [cols, customColumns, colWidths, colSizes]);
+
+        const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+
+        const handleDeleteClick = (rowId: string) => {
+            if (onDelete) {
+                onDelete(rowId);
             }
+        };
 
-            // Final fallback - Services gets remaining space
-            if (c === 'services') {
-                return `minmax(${columnConstraints.min}px, 1fr)`;
-            }
-            return `${columnConstraints.min}px`;
-        });
-
-        const custom = customColumns.map(() => '110px');
-        const parts = [deleteCol, ...base, ...custom].filter(Boolean);
-        return parts.join(' ');
-    }, [cols, customColumns, colWidths, colSizes]);
-
-    const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
-
-    const handleDeleteClick = (rowId: string) => {
-        if (onDelete) {
-            onDelete(rowId);
-        }
-    };
-
-    // removed fill down state
+        // removed fill down state
 
         const startResize = (colKey: string, e: any) => {
-        e.preventDefault();
-        e.stopPropagation();
+            e.preventDefault();
+            e.stopPropagation();
 
-        const tableContainer = e.currentTarget.closest('.grid');
-        if (!tableContainer) return;
+            const tableContainer = e.currentTarget.closest('.grid');
+            if (!tableContainer) return;
 
-        const startX = e.clientX;
+            const startX = e.clientX;
             const startWidth =
                 colWidths[colKey] ||
                 parseInt(colSizes[colKey]?.replace('px', '') || '140') ||
                 140;
 
-        // Define column-specific constraints
-        const constraints = {
+            // Define column-specific constraints
+            const constraints = {
                 enterprise: {min: 140, max: 250}, // Increased min to prevent arrow overlap
                 product: {min: 140, max: 280}, // Reduced max to prevent over-expansion
                 services: {min: 500, max: 2000}, // Increased minimum to ensure Services content visibility when scrolled
-        };
+            };
 
             const columnConstraints = constraints[
                 colKey as keyof typeof constraints
             ] || {min: 100, max: 250};
 
-        // Add visual feedback during resize
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
+            // Add visual feedback during resize
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
 
-        const onMove = (ev: MouseEvent) => {
-            ev.preventDefault();
-            const delta = ev.clientX - startX;
-            const newWidth = Math.max(
-                columnConstraints.min,
+            const onMove = (ev: MouseEvent) => {
+                ev.preventDefault();
+                const delta = ev.clientX - startX;
+                const newWidth = Math.max(
+                    columnConstraints.min,
                     Math.min(columnConstraints.max, startWidth + delta),
-            );
+                );
 
-            setColWidths((prev) => ({
-                ...prev,
+                setColWidths((prev) => ({
+                    ...prev,
                     [colKey]: newWidth,
-            }));
+                }));
 
-            // Trigger scroll check during resize to detect Services column visibility
-            setTimeout(() => {
-                if (tableContainerRef.current) {
+                // Trigger scroll check during resize to detect Services column visibility
+                setTimeout(() => {
+                    if (tableContainerRef.current) {
                         const contentWidth =
                             tableContainerRef.current.scrollWidth;
                         const containerWidth =
                             tableContainerRef.current.clientWidth;
 
-                    // Check if Services content is getting hidden
+                        // Check if Services content is getting hidden
                         const servicesColumns =
                             tableContainerRef.current.querySelectorAll(
                                 '[data-col="services"]',
                             );
-                    let servicesContentHidden = false;
+                        let servicesContentHidden = false;
 
                         servicesColumns.forEach((serviceCol) => {
-                        const serviceElement = serviceCol as HTMLElement;
+                            const serviceElement = serviceCol as HTMLElement;
                             const serviceRect =
                                 serviceElement.getBoundingClientRect();
                             const containerRect =
                                 tableContainerRef.current!.getBoundingClientRect();
 
-                        // Enhanced threshold based on zoom and AI panel state
-                        const currentZoom = window.devicePixelRatio || 1;
-                        const isZoomedIn = currentZoom > 1.1;
-                        let widthThreshold = 500; // Increased base threshold for better content visibility
-                        if (isZoomedIn) widthThreshold += 50;
-                        if (isAIInsightsPanelOpen) widthThreshold += 50;
+                            // Enhanced threshold based on zoom and AI panel state
+                            const currentZoom = window.devicePixelRatio || 1;
+                            const isZoomedIn = currentZoom > 1.1;
+                            let widthThreshold = 500; // Increased base threshold for better content visibility
+                            if (isZoomedIn) widthThreshold += 50;
+                            if (isAIInsightsPanelOpen) widthThreshold += 50;
 
                             if (
                                 serviceRect.right > containerRect.right ||
                                 serviceRect.width < widthThreshold
                             ) {
-                            servicesContentHidden = true;
-                        }
-                    });
+                                servicesContentHidden = true;
+                            }
+                        });
 
-                    // Enhanced scrollbar logic with zoom and AI panel considerations
-                    const currentZoom = window.devicePixelRatio || 1;
-                    const isZoomedIn = currentZoom > 1.1;
-                    const viewportWidth = window.innerWidth;
-                    const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
-                    const availableWidth = viewportWidth - aiPanelWidth;
-                    const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
+                        // Enhanced scrollbar logic with zoom and AI panel considerations
+                        const currentZoom = window.devicePixelRatio || 1;
+                        const isZoomedIn = currentZoom > 1.1;
+                        const viewportWidth = window.innerWidth;
+                        const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
+                        const availableWidth = viewportWidth - aiPanelWidth;
+                        const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
 
-                    const needsScrollbar =
+                        const needsScrollbar =
                             contentWidth * zoomAdjustedThreshold >
                                 containerWidth ||
-                        servicesContentHidden ||
+                            servicesContentHidden ||
                             (isZoomedIn &&
                                 contentWidth > availableWidth * 0.95) ||
                             (isAIInsightsPanelOpen &&
                                 contentWidth > availableWidth * 0.9);
 
-                    setShouldShowHorizontalScroll(needsScrollbar);
-                }
-            }, 10);
-        };
+                        setShouldShowHorizontalScroll(needsScrollbar);
+                    }
+                }, 10);
+            };
 
-        const onUp = () => {
-            // Remove visual feedback
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
+            const onUp = () => {
+                // Remove visual feedback
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
 
-            // Final check for scrollbar need after resize is complete
-            setTimeout(() => {
-                if (tableContainerRef.current) {
+                // Final check for scrollbar need after resize is complete
+                setTimeout(() => {
+                    if (tableContainerRef.current) {
                         const contentWidth =
                             tableContainerRef.current.scrollWidth;
                         const containerWidth =
                             tableContainerRef.current.clientWidth;
 
-                    // Check if Services content is hidden
+                        // Check if Services content is hidden
                         const servicesColumns =
                             tableContainerRef.current.querySelectorAll(
                                 '[data-col="services"]',
                             );
-                    let servicesContentHidden = false;
+                        let servicesContentHidden = false;
 
                         servicesColumns.forEach((serviceCol) => {
-                        const serviceElement = serviceCol as HTMLElement;
+                            const serviceElement = serviceCol as HTMLElement;
                             const serviceRect =
                                 serviceElement.getBoundingClientRect();
                             const containerRect =
                                 tableContainerRef.current!.getBoundingClientRect();
 
-                        // Enhanced threshold based on zoom and AI panel state
-                        const currentZoom = window.devicePixelRatio || 1;
-                        const isZoomedIn = currentZoom > 1.1;
-                        let widthThreshold = 500; // Increased base threshold for better content visibility
-                        if (isZoomedIn) widthThreshold += 50;
-                        if (isAIInsightsPanelOpen) widthThreshold += 50;
+                            // Enhanced threshold based on zoom and AI panel state
+                            const currentZoom = window.devicePixelRatio || 1;
+                            const isZoomedIn = currentZoom > 1.1;
+                            let widthThreshold = 500; // Increased base threshold for better content visibility
+                            if (isZoomedIn) widthThreshold += 50;
+                            if (isAIInsightsPanelOpen) widthThreshold += 50;
 
                             if (
                                 serviceRect.right > containerRect.right ||
                                 serviceRect.width < widthThreshold
                             ) {
-                            servicesContentHidden = true;
-                        }
-                    });
+                                servicesContentHidden = true;
+                            }
+                        });
 
-                    // Enhanced scrollbar logic with zoom and AI panel considerations
-                    const currentZoom = window.devicePixelRatio || 1;
-                    const isZoomedIn = currentZoom > 1.1;
-                    const viewportWidth = window.innerWidth;
-                    const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
-                    const availableWidth = viewportWidth - aiPanelWidth;
-                    const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
+                        // Enhanced scrollbar logic with zoom and AI panel considerations
+                        const currentZoom = window.devicePixelRatio || 1;
+                        const isZoomedIn = currentZoom > 1.1;
+                        const viewportWidth = window.innerWidth;
+                        const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0;
+                        const availableWidth = viewportWidth - aiPanelWidth;
+                        const zoomAdjustedThreshold = isZoomedIn ? 0.9 : 1.0;
 
-                    const needsScrollbar =
+                        const needsScrollbar =
                             contentWidth * zoomAdjustedThreshold >
                                 containerWidth ||
-                        servicesContentHidden ||
+                            servicesContentHidden ||
                             (isZoomedIn &&
                                 contentWidth > availableWidth * 0.95) ||
                             (isAIInsightsPanelOpen &&
                                 contentWidth > availableWidth * 0.9);
 
-                    setShouldShowHorizontalScroll(needsScrollbar);
-                }
-            }, 50);
+                        setShouldShowHorizontalScroll(needsScrollbar);
+                    }
+                }, 50);
 
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+            };
+
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
         };
 
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
-    };
+        // removed fill handlers
 
-    // removed fill handlers
+        const toggleExpanded = (id: string) => {
+            setExpandedRows((prev) => {
+                const next = new Set(prev);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                return next;
+            });
+        };
 
-    const toggleExpanded = (id: string) => {
-        setExpandedRows((prev) => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    };
+        // For compatibility with the component usage
+        const toggleRowExpansion = toggleExpanded;
 
-    // For compatibility with the component usage
-    const toggleRowExpansion = toggleExpanded;
+        const highlightText = (text: string) => {
+            const q = (highlightQuery || '').trim();
+            if (!q) return <>{text}</>;
+            try {
+                const esc = q.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+                const re = new RegExp(`(${esc})`, 'ig');
+                const parts = text.split(re);
+                return (
+                    <>
+                        {parts.map((part, i) =>
+                            re.test(part) ? (
+                                <mark
+                                    key={i}
+                                    className='bg-yellow-200 px-0.5 rounded'
+                                >
+                                    {part}
+                                </mark>
+                            ) : (
+                                <span key={i}>{part}</span>
+                            ),
+                        )}
+                    </>
+                );
+            } catch {
+                return <>{text}</>;
+            }
+        };
 
-    const highlightText = (text: string) => {
-        const q = (highlightQuery || '').trim();
-        if (!q) return <>{text}</>;
-        try {
-            const esc = q.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
-            const re = new RegExp(`(${esc})`, 'ig');
-            const parts = text.split(re);
-            return (
-                <>
-                    {parts.map((part, i) =>
-                        re.test(part) ? (
-                            <mark
-                                key={i}
-                                className='bg-yellow-200 px-0.5 rounded'
-                            >
-                                {part}
-                            </mark>
-                        ) : (
-                            <span key={i}>{part}</span>
-                        ),
-                    )}
-                </>
-            );
-        } catch {
-            return <>{text}</>;
-        }
-    };
+        // Handle delete click - directly call parent's onDelete function
 
-    // Handle delete click - directly call parent's onDelete function
-
-    // Use external sort state if provided, otherwise fall back to internal state
-    const [internalSortCol, setInternalSortCol] = useState<
-        | 'accountName'
-        | 'email'
-        | 'phone'
-        | 'status'
-        | 'servicesCount'
-        | null
-    >(null);
+        // Use external sort state if provided, otherwise fall back to internal state
+        const [internalSortCol, setInternalSortCol] = useState<
+            | 'accountName'
+            | 'email'
+            | 'phone'
+            | 'status'
+            | 'servicesCount'
+            | null
+        >(null);
         const [internalSortDir, setInternalSortDir] = useState<
             'asc' | 'desc' | null
         >(null);
 
-    // Listen for clear sorting events from parent component
-    useEffect(() => {
-        const handleClearSorting = () => {
-            setInternalSortCol(null);
-            setInternalSortDir(null);
-        };
+        // Listen for clear sorting events from parent component
+        useEffect(() => {
+            const handleClearSorting = () => {
+                setInternalSortCol(null);
+                setInternalSortDir(null);
+            };
 
-        window.addEventListener('clearTableSorting', handleClearSorting);
+            window.addEventListener('clearTableSorting', handleClearSorting);
 
-        return () => {
+            return () => {
                 window.removeEventListener(
                     'clearTableSorting',
                     handleClearSorting,
                 );
-        };
-    }, []);
+            };
+        }, []);
 
-    // Use external sort state if available, otherwise use internal state
-    const sortCol = externalSortColumn || internalSortCol;
-    const sortDir = externalSortDirection || internalSortDir;
+        // Use external sort state if available, otherwise use internal state
+        const sortCol = externalSortColumn || internalSortCol;
+        const sortDir = externalSortDirection || internalSortDir;
 
-    const toggleSort = (
+        const toggleSort = (
             col: 'accountName' | 'email' | 'phone' | 'status' | 'servicesCount',
             direction?: 'asc' | 'desc',
-    ) => {
-        let nextDir: 'asc' | 'desc';
+        ) => {
+            let nextDir: 'asc' | 'desc';
 
-        // Check if external sorting is actively being used (both props provided and not empty)
+            // Check if external sorting is actively being used (both props provided and not empty)
             const isExternalSorting =
                 externalSortColumn && externalSortDirection;
 
-        if (isExternalSorting) {
-            // When external sort is actively controlled, use external state for calculation
+            if (isExternalSorting) {
+                // When external sort is actively controlled, use external state for calculation
                 nextDir =
                     direction ||
-                (sortCol === col && sortDir === 'asc' ? 'desc' : 'asc');
+                    (sortCol === col && sortDir === 'asc' ? 'desc' : 'asc');
 
-            // Notify parent to update external sort state
-            if (onSortChange) {
-                onSortChange(col, nextDir);
-            }
-        } else {
-            // When using internal sort (including first time with no sorting)
+                // Notify parent to update external sort state
+                if (onSortChange) {
+                    onSortChange(col, nextDir);
+                }
+            } else {
+                // When using internal sort (including first time with no sorting)
                 nextDir =
                     direction ||
                     (internalSortCol === col && internalSortDir === 'asc'
                         ? 'desc'
                         : 'asc');
 
-            // Update internal state first (this actually sorts the table)
-            setInternalSortCol(col);
-            setInternalSortDir(nextDir);
+                // Update internal state first (this actually sorts the table)
+                setInternalSortCol(col);
+                setInternalSortDir(nextDir);
 
-            // Then notify parent to update Sort panel (for toolbar sync)
-            if (onSortChange) {
-                onSortChange(col, nextDir);
+                // Then notify parent to update Sort panel (for toolbar sync)
+                if (onSortChange) {
+                    onSortChange(col, nextDir);
+                }
             }
-        }
 
-        // Always dispatch custom event for parent component to listen to
-        notifyParentSortChange(col, nextDir);
-    };
+            // Always dispatch custom event for parent component to listen to
+            notifyParentSortChange(col, nextDir);
+        };
 
-    // Function to notify parent component about sort changes via custom event
+        // Function to notify parent component about sort changes via custom event
         const notifyParentSortChange = (
             column: string,
             direction: 'asc' | 'desc',
         ) => {
-        // Dispatch a custom event that the parent can listen to
-        const event = new CustomEvent('enterpriseTableSortChange', {
-            detail: {
-                column,
+            // Dispatch a custom event that the parent can listen to
+            const event = new CustomEvent('enterpriseTableSortChange', {
+                detail: {
+                    column,
                     direction,
-            },
+                },
                 bubbles: true,
-        });
-
-        // Dispatch the event from the document to ensure it reaches the parent
-        document.dispatchEvent(event);
-    };
-
-    const displayItems = useMemo(() => {
-        const base = [...orderedItems];
-        if (!sortCol || !sortDir) return base;
-        base.sort((a, b) => {
-            const av = String((a as any)[sortCol] ?? '');
-            const bv = String((b as any)[sortCol] ?? '');
-            const comp = av.localeCompare(bv, undefined, {
-                numeric: true,
-                sensitivity: 'base',
             });
-            return sortDir === 'asc' ? comp : -comp;
-        });
-        return base;
-    }, [orderedItems, sortCol, sortDir]);
 
-    // Group data based on groupBy setting
-    const groupedItems = useMemo(() => {
-        if (groupBy === 'none') {
+            // Dispatch the event from the document to ensure it reaches the parent
+            document.dispatchEvent(event);
+        };
+
+        const displayItems = useMemo(() => {
+            const base = [...orderedItems];
+            if (!sortCol || !sortDir) return base;
+            base.sort((a, b) => {
+                const av = String((a as any)[sortCol] ?? '');
+                const bv = String((b as any)[sortCol] ?? '');
+                const comp = av.localeCompare(bv, undefined, {
+                    numeric: true,
+                    sensitivity: 'base',
+                });
+                return sortDir === 'asc' ? comp : -comp;
+            });
+            return base;
+        }, [orderedItems, sortCol, sortDir]);
+
+        // Group data based on groupBy setting
+        const groupedItems = useMemo(() => {
+            if (groupBy === 'none') {
                 return {'All Records': displayItems};
-        }
+            }
 
-        const groups: Record<string, CredentialRow[]> = {};
+            const groups: Record<string, CredentialRow[]> = {};
 
-        displayItems.forEach((item) => {
-            let groupKey = '';
+            displayItems.forEach((item) => {
+                let groupKey = '';
 
-            switch (groupBy) {
-                case 'credentialName':
+                switch (groupBy) {
+                    case 'credentialName':
                         groupKey =
                             item.credentialName || '(No Credential Name)';
-                    break;
-                case 'entity':
-                    groupKey = item.entity || '(No Entity)';
-                    break;
-                case 'product':
-                    groupKey = item.product || '(No Product)';
-                    break;
-                case 'service':
-                    groupKey = item.service || '(No Service)';
-                    break;
-                default:
-                    groupKey = 'All Records';
-            }
+                        break;
+                    case 'entity':
+                        groupKey = item.entity || '(No Entity)';
+                        break;
+                    case 'product':
+                        groupKey = item.product || '(No Product)';
+                        break;
+                    case 'service':
+                        groupKey = item.service || '(No Service)';
+                        break;
+                    default:
+                        groupKey = 'All Records';
+                }
 
-            if (!groups[groupKey]) {
-                groups[groupKey] = [];
-            }
-            groups[groupKey].push(item);
-        });
+                if (!groups[groupKey]) {
+                    groups[groupKey] = [];
+                }
+                groups[groupKey].push(item);
+            });
 
-        // Sort group keys alphabetically, but keep "(No ...)" groups at the end
-        const sortedGroups: Record<string, CredentialRow[]> = {};
-        const sortedKeys = Object.keys(groups).sort((a, b) => {
-            const aIsEmpty = a.startsWith('(No ');
-            const bIsEmpty = b.startsWith('(No ');
-            if (aIsEmpty && !bIsEmpty) return 1;
-            if (!aIsEmpty && bIsEmpty) return -1;
-            return a.localeCompare(b);
-        });
+            // Sort group keys alphabetically, but keep "(No ...)" groups at the end
+            const sortedGroups: Record<string, CredentialRow[]> = {};
+            const sortedKeys = Object.keys(groups).sort((a, b) => {
+                const aIsEmpty = a.startsWith('(No ');
+                const bIsEmpty = b.startsWith('(No ');
+                if (aIsEmpty && !bIsEmpty) return 1;
+                if (!aIsEmpty && bIsEmpty) return -1;
+                return a.localeCompare(b);
+            });
 
             sortedKeys.forEach((key) => {
-            sortedGroups[key] = groups[key];
-        });
+                sortedGroups[key] = groups[key];
+            });
 
-        return sortedGroups;
-    }, [displayItems, groupBy]);
+            return sortedGroups;
+        }, [displayItems, groupBy]);
 
-    // Hook to detect if horizontal scroll is needed based on zoom/viewport and column resizing
+        // Hook to detect if horizontal scroll is needed based on zoom/viewport and column resizing
         const [shouldShowHorizontalScroll, setShouldShowHorizontalScroll] =
             useState(false);
-    const tableContainerRef = useRef<HTMLDivElement>(null);
+        const tableContainerRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const checkScrollNeed = () => {
-            if (!tableContainerRef.current) return;
+        useEffect(() => {
+            const checkScrollNeed = () => {
+                if (!tableContainerRef.current) return;
 
-            // With 6+ columns, we likely always need horizontal scrolling
-            // Simplified logic: if we have more than 6 columns, enable scrolling
-            const totalColumns = 6; // groupName, description, entity, product, service, roles
-            const shouldAlwaysScroll = totalColumns >= 6;
+                // With 6+ columns, we likely always need horizontal scrolling
+                // Simplified logic: if we have more than 6 columns, enable scrolling
+                const totalColumns = 6; // groupName, description, entity, product, service, roles
+                const shouldAlwaysScroll = totalColumns >= 6;
 
-            if (shouldAlwaysScroll) {
-                setShouldShowHorizontalScroll(true);
-                return;
-            }
+                if (shouldAlwaysScroll) {
+                    setShouldShowHorizontalScroll(true);
+                    return;
+                }
 
-            // Get current zoom level
-            const currentZoom = window.devicePixelRatio || 1;
-            const baseZoom = 1;
-            const zoomFactor = currentZoom / baseZoom;
+                // Get current zoom level
+                const currentZoom = window.devicePixelRatio || 1;
+                const baseZoom = 1;
+                const zoomFactor = currentZoom / baseZoom;
 
-            // Get viewport dimensions accounting for AI insights panel
-            const viewportWidth = window.innerWidth;
-            const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0; // Estimated AI panel width
-            const availableWidth = viewportWidth - aiPanelWidth;
+                // Get viewport dimensions accounting for AI insights panel
+                const viewportWidth = window.innerWidth;
+                const aiPanelWidth = isAIInsightsPanelOpen ? 400 : 0; // Estimated AI panel width
+                const availableWidth = viewportWidth - aiPanelWidth;
 
-            // Check if content width exceeds container width with a larger buffer for hover effects
-            const contentWidth = tableContainerRef.current.scrollWidth;
-            const containerWidth = tableContainerRef.current.clientWidth;
+                // Check if content width exceeds container width with a larger buffer for hover effects
+                const contentWidth = tableContainerRef.current.scrollWidth;
+                const containerWidth = tableContainerRef.current.clientWidth;
 
-            // Increased buffer to account for hover scale effects (scale: 1.02 = 2% increase)
-            const hoverBuffer = Math.max(20, containerWidth * 0.025); // 2.5% of container width or 20px minimum
+                // Increased buffer to account for hover scale effects (scale: 1.02 = 2% increase)
+                const hoverBuffer = Math.max(20, containerWidth * 0.025); // 2.5% of container width or 20px minimum
 
-            // Only show scrollbar when content genuinely exceeds container accounting for hover effects
+                // Only show scrollbar when content genuinely exceeds container accounting for hover effects
                 const isContentOverflowing =
                     contentWidth > containerWidth + hoverBuffer;
 
-            // Check if Services column content is actually being cut off
+                // Check if Services column content is actually being cut off
                 const servicesColumns =
                     tableContainerRef.current.querySelectorAll(
                         '[data-col="services"]',
                     );
-            let servicesContentHidden = false;
+                let servicesContentHidden = false;
 
-            if (servicesColumns.length > 0) {
+                if (servicesColumns.length > 0) {
                     servicesColumns.forEach((serviceCol) => {
-                    const serviceElement = serviceCol as HTMLElement;
+                        const serviceElement = serviceCol as HTMLElement;
                         const serviceRect =
                             serviceElement.getBoundingClientRect();
                         const containerRect =
                             tableContainerRef.current!.getBoundingClientRect();
 
-                    // More reasonable threshold - minimum 300px for services content
-                    const minServicesWidth = 300;
-                    const bufferZone = 15; // Additional buffer for hover effects
+                        // More reasonable threshold - minimum 300px for services content
+                        const minServicesWidth = 300;
+                        const bufferZone = 15; // Additional buffer for hover effects
 
-                    // Only trigger if Services column is actually cut off or too narrow to display content properly
+                        // Only trigger if Services column is actually cut off or too narrow to display content properly
                         if (
                             serviceRect.right >
                                 containerRect.right - bufferZone ||
                             serviceRect.width < minServicesWidth
                         ) {
-                        // Additional check: see if there's actually content being cut off
+                            // Additional check: see if there's actually content being cut off
                             const servicesChips =
                                 serviceElement.querySelectorAll(
                                     '.bg-white, .bg-gray-100, .bg-blue-50',
                                 );
-                        if (servicesChips.length > 0) {
+                            if (servicesChips.length > 0) {
                                 servicesChips.forEach((chip) => {
                                     const chipRect =
                                         chip.getBoundingClientRect();
-                                // Account for hover effects in chip positioning
+                                    // Account for hover effects in chip positioning
                                     if (
                                         chipRect.right >
                                         serviceRect.right - bufferZone
                                     ) {
-                                    servicesContentHidden = true;
-                                }
-                            });
+                                        servicesContentHidden = true;
+                                    }
+                                });
+                            }
                         }
+                    });
+                }
+
+                // Show scrollbar only when there's genuine overflow or content is being cut off
+                const needsScrollbar =
+                    isContentOverflowing || servicesContentHidden;
+
+                setShouldShowHorizontalScroll(needsScrollbar);
+            };
+
+            // Check on mount and when table structure changes
+            let scrollCheckTimeout: NodeJS.Timeout;
+            const debouncedScrollCheck = () => {
+                clearTimeout(scrollCheckTimeout);
+                scrollCheckTimeout = setTimeout(checkScrollNeed, 200); // Debounce to prevent flickering
+            };
+
+            checkScrollNeed();
+
+            // Use ResizeObserver for better performance
+            const resizeObserver = new ResizeObserver(() => {
+                debouncedScrollCheck(); // Use debounced version
+            });
+
+            // Use MutationObserver to detect when Services content changes
+            const mutationObserver = new MutationObserver((mutations) => {
+                let shouldCheck = false;
+                mutations.forEach((mutation) => {
+                    // Check if Services column content changed
+                    if (mutation.target instanceof Element) {
+                        const servicesCol = mutation.target.closest(
+                            '[data-col="services"]',
+                        );
+                        if (servicesCol) {
+                            shouldCheck = true;
+                        }
+                    }
+                });
+                if (shouldCheck) {
+                    debouncedScrollCheck(); // Use debounced version
+                }
+            });
+
+            if (tableContainerRef.current) {
+                resizeObserver.observe(tableContainerRef.current);
+                mutationObserver.observe(tableContainerRef.current, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['style', 'class'],
+                });
+
+                // Also observe all column cells for resize changes
+                const columnCells =
+                    tableContainerRef.current.querySelectorAll('[data-col]');
+                columnCells.forEach((cell) => {
+                    if (cell instanceof Element) {
+                        resizeObserver.observe(cell);
                     }
                 });
             }
 
-            // Show scrollbar only when there's genuine overflow or content is being cut off
-                const needsScrollbar =
-                    isContentOverflowing || servicesContentHidden;
+            // Also listen for window resize (zoom changes)
+            window.addEventListener('resize', debouncedScrollCheck);
 
-            setShouldShowHorizontalScroll(needsScrollbar);
-        };
-
-        // Check on mount and when table structure changes
-        let scrollCheckTimeout: NodeJS.Timeout;
-        const debouncedScrollCheck = () => {
-            clearTimeout(scrollCheckTimeout);
-            scrollCheckTimeout = setTimeout(checkScrollNeed, 200); // Debounce to prevent flickering
-        };
-
-        checkScrollNeed();
-
-        // Use ResizeObserver for better performance
-        const resizeObserver = new ResizeObserver(() => {
-            debouncedScrollCheck(); // Use debounced version
-        });
-
-        // Use MutationObserver to detect when Services content changes
-        const mutationObserver = new MutationObserver((mutations) => {
-            let shouldCheck = false;
-            mutations.forEach((mutation) => {
-                // Check if Services column content changed
-                if (mutation.target instanceof Element) {
-                        const servicesCol = mutation.target.closest(
-                            '[data-col="services"]',
-                        );
-                    if (servicesCol) {
-                        shouldCheck = true;
-                    }
-                }
-            });
-            if (shouldCheck) {
-                debouncedScrollCheck(); // Use debounced version
-            }
-        });
-
-        if (tableContainerRef.current) {
-            resizeObserver.observe(tableContainerRef.current);
-            mutationObserver.observe(tableContainerRef.current, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                    attributeFilter: ['style', 'class'],
-            });
-
-            // Also observe all column cells for resize changes
-                const columnCells =
-                    tableContainerRef.current.querySelectorAll('[data-col]');
-                columnCells.forEach((cell) => {
-                if (cell instanceof Element) {
-                    resizeObserver.observe(cell);
-                }
-            });
-        }
-
-        // Also listen for window resize (zoom changes)
-        window.addEventListener('resize', debouncedScrollCheck);
-
-        // Listen for zoom via keyboard shortcuts and mouse wheel
-        const handleKeyZoom = (e: KeyboardEvent) => {
+            // Listen for zoom via keyboard shortcuts and mouse wheel
+            const handleKeyZoom = (e: KeyboardEvent) => {
                 if (
                     (e.ctrlKey || e.metaKey) &&
                     (e.key === '+' || e.key === '-' || e.key === '0')
                 ) {
-                debouncedScrollCheck();
-            }
-        };
+                    debouncedScrollCheck();
+                }
+            };
 
-        const handleWheelZoom = (e: WheelEvent) => {
-            if (e.ctrlKey || e.metaKey) {
-                debouncedScrollCheck();
-            }
-        };
+            const handleWheelZoom = (e: WheelEvent) => {
+                if (e.ctrlKey || e.metaKey) {
+                    debouncedScrollCheck();
+                }
+            };
 
-        window.addEventListener('keydown', handleKeyZoom);
+            window.addEventListener('keydown', handleKeyZoom);
             window.addEventListener('wheel', handleWheelZoom, {passive: true});
 
-        // Call checkScrollNeed initially
-        checkScrollNeed();
+            // Call checkScrollNeed initially
+            checkScrollNeed();
 
-        return () => {
-            resizeObserver.disconnect();
-            mutationObserver.disconnect();
-            window.removeEventListener('resize', debouncedScrollCheck);
-            window.removeEventListener('keydown', handleKeyZoom);
-            window.removeEventListener('wheel', handleWheelZoom);
-            clearTimeout(scrollCheckTimeout);
-        };
-    }, [gridTemplate, colWidths, isAIInsightsPanelOpen]); // Re-check when table structure or AI panel state changes
+            return () => {
+                resizeObserver.disconnect();
+                mutationObserver.disconnect();
+                window.removeEventListener('resize', debouncedScrollCheck);
+                window.removeEventListener('keydown', handleKeyZoom);
+                window.removeEventListener('wheel', handleWheelZoom);
+                clearTimeout(scrollCheckTimeout);
+            };
+        }, [gridTemplate, colWidths, isAIInsightsPanelOpen]); // Re-check when table structure or AI panel state changes
 
-    return (
+        return (
             <div
                 className='compact-table safari-tight manage-user-groups-table'
                 style={{width: '100%', minWidth: 'max-content'}}
             >
-            {/* Using browser default scrollbars only - remove internal scroll containers */}
+                {/* Using browser default scrollbars only - remove internal scroll containers */}
                 <style
                     dangerouslySetInnerHTML={{
-                __html: `
+                        __html: `
                     /* Use browser's natural scrolling - no internal scroll containers */
                     .manage-user-groups-table div[role="table"] {
                         overflow: visible !important;
@@ -10355,98 +10371,98 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                 `,
                     }}
                 />
-            {cols.length === 0 ? (
-                <div className='bg-white border border-slate-200 rounded-lg p-8 text-center'>
-                    <div className='flex flex-col items-center space-y-4'>
-                        <svg
-                            className='w-12 h-12 text-slate-400'
-                            fill='none'
-                            viewBox='0 0 24 24'
-                            stroke='currentColor'
-                        >
-                            <path
-                                strokeLinecap='round'
-                                strokeLinejoin='round'
-                                strokeWidth={1.5}
-                                d='M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z'
-                            />
-                        </svg>
-                        <div className='space-y-2'>
-                            <h3 className='text-lg font-medium text-slate-900'>
-                                No columns are visible
-                            </h3>
-                            <p className='text-sm text-slate-500 max-w-sm'>
+                {cols.length === 0 ? (
+                    <div className='bg-white border border-slate-200 rounded-lg p-8 text-center'>
+                        <div className='flex flex-col items-center space-y-4'>
+                            <svg
+                                className='w-12 h-12 text-slate-400'
+                                fill='none'
+                                viewBox='0 0 24 24'
+                                stroke='currentColor'
+                            >
+                                <path
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    strokeWidth={1.5}
+                                    d='M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z'
+                                />
+                            </svg>
+                            <div className='space-y-2'>
+                                <h3 className='text-lg font-medium text-slate-900'>
+                                    No columns are visible
+                                </h3>
+                                <p className='text-sm text-slate-500 max-w-sm'>
                                     All columns have been hidden. Use the
                                     Show/Hide button in the toolbar to select
                                     which columns to display, or click the
                                     button below to show all columns.
-                            </p>
-                        </div>
-                        {onShowAllColumns && (
-                            <button
-                                onClick={onShowAllColumns}
-                                className='inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200'
-                            >
-                                <svg
-                                    className='w-4 h-4'
-                                    fill='none'
-                                    viewBox='0 0 24 24'
-                                    stroke='currentColor'
+                                </p>
+                            </div>
+                            {onShowAllColumns && (
+                                <button
+                                    onClick={onShowAllColumns}
+                                    className='inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200'
                                 >
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth={2}
-                                        d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'
-                                    />
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth={2}
-                                        d='M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z'
-                                    />
-                                </svg>
-                                Show All Columns
-                            </button>
-                        )}
+                                    <svg
+                                        className='w-4 h-4'
+                                        fill='none'
+                                        viewBox='0 0 24 24'
+                                        stroke='currentColor'
+                                    >
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'
+                                        />
+                                        <path
+                                            strokeLinecap='round'
+                                            strokeLinejoin='round'
+                                            strokeWidth={2}
+                                            d='M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z'
+                                        />
+                                    </svg>
+                                    Show All Columns
+                                </button>
+                            )}
+                        </div>
                     </div>
-                </div>
-            ) : (
-                <div
-                    ref={tableContainerRef}
-                    role='table'
-                    className='p-0 w-full'
+                ) : (
+                    <div
+                        ref={tableContainerRef}
+                        role='table'
+                        className='p-0 w-full'
                         style={
                             {
-                        maxWidth: '100%',
-                        minHeight: '400px', // Ensure minimum height for proper modal display
+                                maxWidth: '100%',
+                                minHeight: '400px', // Ensure minimum height for proper modal display
                                 boxSizing: 'border-box',
                             } as React.CSSProperties
                         }
-                >
+                    >
                         <div
                             className='w-full relative'
                             style={{
-                    minWidth: 'max-content', // Let content determine the minimum width
-                    width: '100%', // Respect container width
+                                minWidth: 'max-content', // Let content determine the minimum width
+                                width: '100%', // Respect container width
                                 maxWidth: '100%', // Don't exceed container
                             }}
                         >
-                    {(() => {
-                        const defaultLabels: Record<string, string> = {
-                            credentialName: 'Credential Name',
-                            description: 'Description',
-                            entity: 'Workstream',
-                            product: 'Product',
-                            service: 'Service',
-                            scope: 'Scope',
-                        };
+                            {(() => {
+                                const defaultLabels: Record<string, string> = {
+                                    credentialName: 'Credential Name',
+                                    description: 'Description',
+                                    entity: 'Workstream',
+                                    product: 'Product',
+                                    service: 'Service',
+                                    scope: 'Scope',
+                                };
 
-                        // Merge custom labels with defaults
-                        const labelFor: Record<string, string> = {
-                            ...defaultLabels,
-                            ...customColumnLabels,
-                        };
+                                // Merge custom labels with defaults
+                                const labelFor: Record<string, string> = {
+                                    ...defaultLabels,
+                                    ...customColumnLabels,
+                                };
 
                                 const iconFor: Record<string, React.ReactNode> =
                                     {
@@ -10457,50 +10473,50 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                         service: <Settings size={14} />,
                                         scope: <Plug size={14} />,
                                         roles: <Shield size={14} />,
-                        };
-                        return (
+                                    };
+                                return (
                                     <div
                                         className='rounded-xl border border-slate-300 shadow-sm bg-white'
                                         style={{
-                                minWidth: 'fit-content',
-                                width: '100%',
-                                maxWidth: '100%',
+                                            minWidth: 'fit-content',
+                                            width: '100%',
+                                            maxWidth: '100%',
                                             overflow: 'visible', // Allow chips to move freely on hover
                                         }}
                                     >
-                                <div
-                                    className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
-                                    style={{
+                                        <div
+                                            className='sticky top-0 z-30 grid w-full gap-0 px-0 py-3 text-xs font-bold text-slate-800 bg-slate-50 border-b border-slate-200 shadow-sm'
+                                            style={{
                                                 gridTemplateColumns:
                                                     gridTemplate,
-                                        minWidth: 'max-content',
-                                        width: '100%',
+                                                minWidth: 'max-content',
+                                                width: '100%',
                                                 display: 'grid',
-                                    }}
-                                >
-                                    {/* Delete Button Column Header */}
-                                    <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r-0 min-w-0 overflow-hidden'>
-                                        {/* Empty header for delete column */}
-                                    </div>
+                                            }}
+                                        >
+                                            {/* Delete Button Column Header */}
+                                            <div className='relative flex items-center justify-center gap-1 px-2 py-1.5 border-r-0 min-w-0 overflow-hidden'>
+                                                {/* Empty header for delete column */}
+                                            </div>
 
-                                    {cols.map((c, idx) => (
-                                        <div
-                                            key={c}
-                                            className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden ${
-                                                idx === 0
-                                                    ? 'border-l-0'
-                                                    : ''
-                                            } ${
+                                            {cols.map((c, idx) => (
+                                                <div
+                                                    key={c}
+                                                    className={`relative flex items-center gap-1 px-2 py-1.5 rounded-sm hover:bg-blue-50 transition-colors duration-150 group min-w-0 overflow-hidden ${
+                                                        idx === 0
+                                                            ? 'border-l-0'
+                                                            : ''
+                                                    } ${
                                                         idx === 0 &&
                                                         pinFirst &&
                                                         !shouldShowHorizontalScroll
-                                                    ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
-                                                    : ''
-                                            } ${
+                                                            ? 'sticky left-0 z-20 bg-slate-50 backdrop-blur-sm shadow-[6px_0_8px_-6px_rgba(15,23,42,0.10)]'
+                                                            : ''
+                                                    } ${
                                                         c === 'scope'
                                                             ? 'border-r-0'
                                                             : 'border-r border-slate-200' // Remove right border for last column
-                                            }`}
+                                                    }`}
                                                     style={
                                                         c === 'scope'
                                                             ? {
@@ -10509,21 +10525,21 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                               }
                                                             : undefined
                                                     } // Width for roles icon
-                                        >
-                                            <div className='flex items-center gap-2 pr-12'>
+                                                >
+                                                    <div className='flex items-center gap-2 pr-12'>
                                                         {iconFor[c] &&
                                                             iconFor[c]}
                                                         <span>
                                                             {labelFor[c] || c}
                                                         </span>
-                                            </div>
-                                            {[
-                                                'credentialName',
-                                                'description',
-                                                'entity',
-                                                'product',
-                                                'service',
-                                            ].includes(c) && (
+                                                    </div>
+                                                    {[
+                                                        'credentialName',
+                                                        'description',
+                                                        'entity',
+                                                        'product',
+                                                        'service',
+                                                    ].includes(c) && (
                                                         <div className='inline-flex items-center absolute right-8 top-1/2 -translate-y-1/2'>
                                                             <div
                                                                 className='relative inline-flex items-center justify-center'
@@ -10532,7 +10548,7 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                                     height: '24px',
                                                                 }}
                                                             >
-                                                        {/* Base combined icon - use separate arrows to allow individual coloring */}
+                                                                {/* Base combined icon - use separate arrows to allow individual coloring */}
                                                                 <div
                                                                     className='relative inline-flex items-center justify-center'
                                                                     style={{
@@ -10540,7 +10556,7 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                                         height: '24px',
                                                                     }}
                                                                 >
-                                                            <ArrowUpIcon
+                                                                    <ArrowUpIcon
                                                                         className={`absolute h-4 w-4 transition-all duration-300 ${
                                                                             sortCol ===
                                                                                 c &&
@@ -10549,9 +10565,9 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                                                 ? 'text-green-600 font-bold'
                                                                                 : 'text-slate-600'
                                                                         }`}
-                                                                style={{
-                                                                    top: '2px',
-                                                                    left: '1px',
+                                                                        style={{
+                                                                            top: '2px',
+                                                                            left: '1px',
                                                                             strokeWidth:
                                                                                 sortCol ===
                                                                                     c &&
@@ -10559,9 +10575,9 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                                                     'asc'
                                                                                     ? '2.5'
                                                                                     : '2',
-                                                                }}
-                                                            />
-                                                            <ArrowDownIcon
+                                                                        }}
+                                                                    />
+                                                                    <ArrowDownIcon
                                                                         className={`absolute h-4 w-4 transition-all duration-300 ${
                                                                             sortCol ===
                                                                                 c &&
@@ -10570,9 +10586,9 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                                                 ? 'text-green-600 font-bold'
                                                                                 : 'text-slate-600'
                                                                         }`}
-                                                                style={{
-                                                                    bottom: '3px',
-                                                                    right: '2px',
+                                                                        style={{
+                                                                            bottom: '3px',
+                                                                            right: '2px',
                                                                             strokeWidth:
                                                                                 sortCol ===
                                                                                     c &&
@@ -10580,42 +10596,42 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                                                     'desc'
                                                                                     ? '2.5'
                                                                                     : '2',
-                                                                }}
-                                                            />
-                                                        </div>
-                                                        {/* Clickable areas for up and down arrows */}
-                                                        <button
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                {/* Clickable areas for up and down arrows */}
+                                                                <button
                                                                     onClick={(
                                                                         e,
                                                                     ) => {
-                                                                e.stopPropagation();
+                                                                        e.stopPropagation();
                                                                         toggleSort(
                                                                             c as any,
                                                                             'asc',
                                                                         );
-                                                            }}
-                                                            className={`absolute top-0 left-0 w-full h-1/2 cursor-pointer hover:bg-green-50/30`}
+                                                                    }}
+                                                                    className={`absolute top-0 left-0 w-full h-1/2 cursor-pointer hover:bg-green-50/30`}
                                                                     aria-label='Sort ascending'
                                                                     title='Sort ascending'
-                                                        />
-                                                        <button
+                                                                />
+                                                                <button
                                                                     onClick={(
                                                                         e,
                                                                     ) => {
-                                                                e.stopPropagation();
+                                                                        e.stopPropagation();
                                                                         toggleSort(
                                                                             c as any,
                                                                             'desc',
                                                                         );
-                                                            }}
-                                                            className={`absolute bottom-0 left-0 w-full h-1/2 cursor-pointer hover:bg-green-50/30`}
+                                                                    }}
+                                                                    className={`absolute bottom-0 left-0 w-full h-1/2 cursor-pointer hover:bg-green-50/30`}
                                                                     aria-label='Sort descending'
                                                                     title='Sort descending'
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {/* Show resize handle for resizable columns but not for last column */}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {/* Show resize handle for resizable columns but not for last column */}
                                                     {[
                                                         'credentialName',
                                                         'description',
@@ -10623,7 +10639,7 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                         'product',
                                                         'service',
                                                     ].includes(c) && (
-                                                <div
+                                                        <div
                                                             onMouseDown={(
                                                                 e: any,
                                                             ) =>
@@ -10631,83 +10647,83 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                                     c,
                                                                     e,
                                                                 )
-                                                    }
-                                                    className='absolute -right-1 top-0 h-full w-3 cursor-col-resize z-30 flex items-center justify-center group/resize hover:bg-blue-100/50'
+                                                            }
+                                                            className='absolute -right-1 top-0 h-full w-3 cursor-col-resize z-30 flex items-center justify-center group/resize hover:bg-blue-100/50'
                                                             title={`Resize ${
                                                                 labelFor[c] || c
                                                             } column`}
-                                                >
-                                                    <div className='h-6 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-60 group-hover/resize:opacity-100 group-hover/resize:w-1 transition-all duration-150 shadow-sm' />
+                                                        >
+                                                            <div className='h-6 w-0.5 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full opacity-60 group-hover/resize:opacity-100 group-hover/resize:w-1 transition-all duration-150 shadow-sm' />
+                                                        </div>
+                                                    )}
+                                                    {c === 'credentialName' && (
+                                                        <span
+                                                            aria-hidden
+                                                            className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
+                                                        />
+                                                    )}
                                                 </div>
-                                            )}
-                                            {c === 'credentialName' && (
-                                                <span
-                                                    aria-hidden
-                                                    className='pointer-events-none absolute right-0 top-0 h-full w-px bg-slate-200/80'
-                                                />
-                                            )}
+                                            ))}
+                                            {customColumns.map((name, idx) => (
+                                                <div
+                                                    key={`custom-${idx}`}
+                                                    className='min-w-0'
+                                                >
+                                                    {name}
+                                                </div>
+                                            ))}
+                                            {/* trailing add column removed */}
                                         </div>
-                                    ))}
-                                    {customColumns.map((name, idx) => (
-                                        <div
-                                            key={`custom-${idx}`}
-                                            className='min-w-0'
-                                        >
-                                            {name}
-                                        </div>
-                                    ))}
-                                    {/* trailing add column removed */}
-                                </div>
-                            </div>
-                        );
-                    })()}
-                    {groupBy === 'none' ? (
-                        <div className='space-y-1 pt-2'>
-                            {displayItems.map((r, idx) => (
-                                <div key={r.id}>
-                                    <SortableCredentialRow
-                                        row={r}
-                                        index={idx}
-                                        cols={cols}
-                                        gridTemplate={gridTemplate}
-                                        highlightQuery={highlightQuery}
-                                        onEdit={onEdit}
-                                        onDelete={onDelete}
-                                        customColumns={customColumns}
-                                        pinFirst={pinFirst}
-                                        firstColWidth={firstColWidth}
+                                    </div>
+                                );
+                            })()}
+                            {groupBy === 'none' ? (
+                                <div className='space-y-1 pt-2'>
+                                    {displayItems.map((r, idx) => (
+                                        <div key={r.id}>
+                                            <SortableCredentialRow
+                                                row={r}
+                                                index={idx}
+                                                cols={cols}
+                                                gridTemplate={gridTemplate}
+                                                highlightQuery={highlightQuery}
+                                                onEdit={onEdit}
+                                                onDelete={onDelete}
+                                                customColumns={customColumns}
+                                                pinFirst={pinFirst}
+                                                firstColWidth={firstColWidth}
                                                 isExpanded={expandedRows.has(
                                                     r.id,
                                                 )}
-                                        onToggle={toggleRowExpansion}
+                                                onToggle={toggleRowExpansion}
                                                 hideRowExpansion={
                                                     hideRowExpansion
                                                 }
-                                        enableDropdownChips={
-                                            enableDropdownChips
-                                        }
-                                        onDropdownOptionUpdate={
-                                            onDropdownOptionUpdate
-                                        }
+                                                enableDropdownChips={
+                                                    enableDropdownChips
+                                                }
+                                                onDropdownOptionUpdate={
+                                                    onDropdownOptionUpdate
+                                                }
                                                 onNewItemCreated={
                                                     onNewItemCreated
                                                 }
-                                        isCellMissing={isCellMissing}
+                                                isCellMissing={isCellMissing}
                                                 compressingRowId={
                                                     compressingRowId
                                                 }
-                                        foldingRowId={foldingRowId}
-                                        allRows={rows}
-                                        expandedContent={null}
-                                        onUpdateField={updateRowField}
+                                                foldingRowId={foldingRowId}
+                                                allRows={rows}
+                                                expandedContent={null}
+                                                onUpdateField={updateRowField}
                                                 isSelected={
                                                     selectedRowId === r.id
                                                 }
                                                 onSelect={(id: string) =>
                                                     setSelectedRowId(id)
                                                 }
-                                        onStartFill={() => {}}
-                                        inFillRange={false}
+                                                onStartFill={() => {}}
+                                                inFillRange={false}
                                                 onDeleteClick={
                                                     handleDeleteClick
                                                 }
@@ -10726,7 +10742,7 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                         setSelectedRoleForScope(
                                                             row,
                                                         );
-                                            setShowScopeModal(true);
+                                                        setShowScopeModal(true);
                                                     })
                                                 }
                                                 onShowStartDateProtectionModal={
@@ -10747,29 +10763,29 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                 selectedAccountName={
                                                     selectedAccountName
                                                 }
-                                    />
-                                </div>
-                            ))}
+                                            />
+                                        </div>
+                                    ))}
 
-                            {/* Add New Row Button */}
-                            {onAddNewRow && (
-                                <div
+                                    {/* Add New Row Button */}
+                                    {onAddNewRow && (
+                                        <div
                                             className='grid w-full gap-0 px-0 py-1 text-sm border-t border-slate-200 h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group'
-                                    style={{
+                                            style={{
                                                 gridTemplateColumns:
                                                     gridTemplate,
-                                        minWidth: 'max-content',
+                                                minWidth: 'max-content',
                                                 width: '100%',
-                                    }}
-                                    onClick={onAddNewRow}
+                                            }}
+                                            onClick={onAddNewRow}
                                             title='Add new account row'
-                                >
-                                    {/* Empty delete button space */}
-                                    <div className='flex items-center justify-center px-2 py-1'>
-                                        {/* No delete icon for add row */}
-                                    </div>
+                                        >
+                                            {/* Empty delete button space */}
+                                            <div className='flex items-center justify-center px-2 py-1'>
+                                                {/* No delete icon for add row */}
+                                            </div>
 
-                                    {/* Add new row content spanning all columns */}
+                                            {/* Add new row content spanning all columns */}
                                             <div
                                                 className='flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 text-slate-500 group-hover:text-blue-600'
                                                 style={{
@@ -10788,52 +10804,52 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                         strokeWidth={2}
                                                         d='M12 4v16m8-8H4'
                                                     />
-                                        </svg>
+                                                </svg>
                                                 <span className='italic'>
                                                     Add New Row
                                                 </span>
-                                    </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div className='space-y-4 mt-2'>
+                            ) : (
+                                <div className='space-y-4 mt-2'>
                                     {Object.entries(groupedItems).map(
                                         ([groupName, groupRows]) => (
                                             <div
                                                 key={groupName}
                                                 className='border border-slate-200 rounded-lg'
                                             >
-                                    {/* Group Header */}
-                                    <div className='bg-slate-50 px-4 py-3 border-b border-slate-200'>
-                                        <h4 className='font-semibold text-slate-900 flex items-center gap-2'>
-                                            <span>{groupName}</span>
-                                            <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700'>
+                                                {/* Group Header */}
+                                                <div className='bg-slate-50 px-4 py-3 border-b border-slate-200'>
+                                                    <h4 className='font-semibold text-slate-900 flex items-center gap-2'>
+                                                        <span>{groupName}</span>
+                                                        <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700'>
                                                             {groupRows.length}{' '}
                                                             record
                                                             {groupRows.length !==
                                                             1
                                                                 ? 's'
                                                                 : ''}
-                                            </span>
-                                        </h4>
-                                    </div>
+                                                        </span>
+                                                    </h4>
+                                                </div>
 
-                                    {/* Group Rows */}
-                                    <div className='border-b border-slate-200 overflow-visible'>
-                                        {groupRows.map((r, idx) => (
-                                            <div key={r.id}>
-                                                <SortableCredentialRow
-                                                    row={r}
-                                                    index={idx}
-                                                    cols={cols}
+                                                {/* Group Rows */}
+                                                <div className='border-b border-slate-200 overflow-visible'>
+                                                    {groupRows.map((r, idx) => (
+                                                        <div key={r.id}>
+                                                            <SortableCredentialRow
+                                                                row={r}
+                                                                index={idx}
+                                                                cols={cols}
                                                                 gridTemplate={
                                                                     gridTemplate
                                                                 }
                                                                 highlightQuery={
                                                                     highlightQuery
                                                                 }
-                                                    onEdit={onEdit}
+                                                                onEdit={onEdit}
                                                                 onDelete={
                                                                     onDelete
                                                                 }
@@ -10855,12 +10871,12 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                                 hideRowExpansion={
                                                                     hideRowExpansion
                                                                 }
-                                                    enableDropdownChips={
-                                                        enableDropdownChips
-                                                    }
-                                                    onDropdownOptionUpdate={
-                                                        onDropdownOptionUpdate
-                                                    }
+                                                                enableDropdownChips={
+                                                                    enableDropdownChips
+                                                                }
+                                                                onDropdownOptionUpdate={
+                                                                    onDropdownOptionUpdate
+                                                                }
                                                                 onNewItemCreated={
                                                                     onNewItemCreated
                                                                 }
@@ -10873,7 +10889,7 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                                 foldingRowId={
                                                                     foldingRowId
                                                                 }
-                                                    allRows={rows}
+                                                                allRows={rows}
                                                                 expandedContent={
                                                                     null
                                                                 }
@@ -10891,7 +10907,7 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                                         id,
                                                                     )
                                                                 }
-                                                    onStartFill={() => {}}
+                                                                onStartFill={() => {}}
                                                                 inFillRange={
                                                                     false
                                                                 }
@@ -10938,34 +10954,34 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                                 selectedAccountName={
                                                                     selectedAccountName
                                                                 }
-                                                />
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
                                         ),
                                     )}
 
-                            {/* Add New Row Button for grouped view */}
-                            {onAddNewRow && (
-                                <div className='border border-slate-200 rounded-lg overflow-visible mt-4'>
-                                    <div
+                                    {/* Add New Row Button for grouped view */}
+                                    {onAddNewRow && (
+                                        <div className='border border-slate-200 rounded-lg overflow-visible mt-4'>
+                                            <div
                                                 className='grid w-full gap-0 px-0 py-1 text-sm h-10 transition-colors duration-150 bg-slate-50/80 hover:bg-blue-50 cursor-pointer group'
-                                        style={{
+                                                style={{
                                                     gridTemplateColumns:
                                                         gridTemplate,
-                                            minWidth: 'max-content',
+                                                    minWidth: 'max-content',
                                                     width: '100%',
-                                        }}
-                                        onClick={onAddNewRow}
+                                                }}
+                                                onClick={onAddNewRow}
                                                 title='Add new account row'
-                                    >
-                                        {/* Empty delete button space */}
-                                        <div className='flex items-center justify-center px-2 py-1'>
-                                            {/* No delete icon for add row */}
-                                        </div>
+                                            >
+                                                {/* Empty delete button space */}
+                                                <div className='flex items-center justify-center px-2 py-1'>
+                                                    {/* No delete icon for add row */}
+                                                </div>
 
-                                        {/* Add new row content spanning all columns */}
+                                                {/* Add new row content spanning all columns */}
                                                 <div
                                                     className='flex items-center justify-start gap-2 px-2 py-1 font-medium transition-colors duration-150 text-slate-500 group-hover:text-blue-600'
                                                     style={{
@@ -10984,104 +11000,104 @@ const ManageCredentialsTable = forwardRef<any, CredentialsTableProps>(
                                                             strokeWidth={2}
                                                             d='M12 4v16m8-8H4'
                                                         />
-                                            </svg>
+                                                    </svg>
                                                     <span className='italic'>
                                                         Add New Row
                                                     </span>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             )}
                         </div>
-                    )}
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Global Validation Modal */}
-            {globalValidationModal.open && (
-                <div className='fixed inset-0 z-50 overflow-y-auto'>
-                    <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
-                        <div
-                            className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
-                            onClick={hideGlobalValidationModal}
-                        ></div>
+                {/* Global Validation Modal */}
+                {globalValidationModal.open && (
+                    <div className='fixed inset-0 z-50 overflow-y-auto'>
+                        <div className='flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'>
+                            <div
+                                className='fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity'
+                                onClick={hideGlobalValidationModal}
+                            ></div>
 
-                        <motion.div
-                            className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'
-                            initial={{opacity: 0, scale: 0.9}}
-                            animate={{opacity: 1, scale: 1}}
-                            exit={{opacity: 0, scale: 0.9}}
-                            transition={{duration: 0.2}}
-                        >
-                            <div className='sm:flex sm:items-start'>
-                                <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10'>
-                                    <svg
-                                        className='h-6 w-6 text-red-500'
-                                        fill='currentColor'
-                                        viewBox='0 0 24 24'
-                                    >
+                            <motion.div
+                                className='relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6'
+                                initial={{opacity: 0, scale: 0.9}}
+                                animate={{opacity: 1, scale: 1}}
+                                exit={{opacity: 0, scale: 0.9}}
+                                transition={{duration: 0.2}}
+                            >
+                                <div className='sm:flex sm:items-start'>
+                                    <div className='mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10'>
+                                        <svg
+                                            className='h-6 w-6 text-red-500'
+                                            fill='currentColor'
+                                            viewBox='0 0 24 24'
+                                        >
                                             <path
                                                 fillRule='evenodd'
                                                 d='M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z'
                                                 clipRule='evenodd'
                                             />
-                                    </svg>
-                                </div>
-                                <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
-                                    <h3 className='text-base font-semibold leading-6 text-gray-900'>
-                                        Information
-                                    </h3>
-                                    <div className='mt-2'>
-                                        <p className='text-sm text-gray-900'>
-                                            {globalValidationModal.message}
-                                        </p>
+                                        </svg>
+                                    </div>
+                                    <div className='mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left'>
+                                        <h3 className='text-base font-semibold leading-6 text-gray-900'>
+                                            Information
+                                        </h3>
+                                        <div className='mt-2'>
+                                            <p className='text-sm text-gray-900'>
+                                                {globalValidationModal.message}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
-                                <button
-                                    type='button'
-                                    className='inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto'
-                                    onClick={hideGlobalValidationModal}
-                                >
-                                    OK
-                                </button>
-                            </div>
-                        </motion.div>
+                                <div className='mt-5 sm:mt-4 sm:flex sm:flex-row-reverse'>
+                                    <button
+                                        type='button'
+                                        className='inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto'
+                                        onClick={hideGlobalValidationModal}
+                                    >
+                                        OK
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Scope Config Modal - Only show if onOpenScopeModal prop is not provided */}
-            {!onOpenScopeModal && (
-                <ScopeConfigModal
-                    isOpen={showScopeModal}
-                    onClose={() => {
-                        setShowScopeModal(false);
-                        setSelectedRoleForScope(null);
-                    }}
-                    roleName={selectedRoleForScope?.credentialName || ''}
+                {/* Scope Config Modal - Only show if onOpenScopeModal prop is not provided */}
+                {!onOpenScopeModal && (
+                    <ScopeConfigModal
+                        isOpen={showScopeModal}
+                        onClose={() => {
+                            setShowScopeModal(false);
+                            setSelectedRoleForScope(null);
+                        }}
+                        roleName={selectedRoleForScope?.credentialName || ''}
                         roleDescription={
                             selectedRoleForScope?.description || ''
                         }
-                    currentScope={selectedRoleForScope?.scope}
-                    onSave={async (scopeConfig: any) => {
-                        console.log('💾 Scope config saved:', scopeConfig);
-                        if (selectedRoleForScope) {
-                            // Update the row with the new scope configuration
+                        currentScope={selectedRoleForScope?.scope}
+                        onSave={async (scopeConfig: any) => {
+                            console.log('💾 Scope config saved:', scopeConfig);
+                            if (selectedRoleForScope) {
+                                // Update the row with the new scope configuration
                                 updateRowField(
                                     selectedRoleForScope.id,
                                     'scope',
                                     JSON.stringify(scopeConfig),
                                 );
-                        }
-                        // Don't close modal here - let the modal's handleSave close it after successful save
-                    }}
-                />
-            )}
-        </div>
-    );
+                            }
+                            // Don't close modal here - let the modal's handleSave close it after successful save
+                        }}
+                    />
+                )}
+            </div>
+        );
     },
 );
 
